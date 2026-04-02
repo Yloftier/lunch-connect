@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import MatchingScreen from './MatchingScreen';
 import CalendarScreen from './CalendarScreen';
 import ClubScreen from './ClubScreen';
+import { supabase } from '../lib/supabase';
+import MyScreen from './MyScreen';
 
 type Tab = 'matching' | 'calendar' | 'restaurant' | 'club' | 'my';
 
@@ -12,12 +14,71 @@ interface Props {
 }
 
 export default function MainScreen({ user }: Props) {
-    const [activeTab, setActiveTab] = useState<Tab>(() => {
-        if (typeof window !== 'undefined') {
-          return (localStorage.getItem('lunch_tab') as Tab) || 'matching';
-        }
-        return 'matching';
-      });
+  const [clubBadge, setClubBadge] = useState(0);
+
+  const fetchClubBadge = async () => {
+    let count = 0;
+
+    // 1. 내가 속한 동아리 확인
+    const { data: myMemberships } = await supabase
+      .from('club_members')
+      .select('club_id, role')
+      .eq('user_id', user.id)
+      .eq('status', '승인');
+
+    if (!myMemberships || myMemberships.length === 0) {
+      setClubBadge(0);
+      return;
+    }
+
+    // 2. 회장인 경우 가입 신청 대기 건 수
+    const presidentClubIds = myMemberships
+      .filter(m => m.role === '회장')
+      .map(m => m.club_id);
+
+    if (presidentClubIds.length > 0) {
+      const { data: pendingData } = await supabase
+        .from('club_members')
+        .select('id')
+        .in('club_id', presidentClubIds)
+        .eq('status', '신청중');
+      count += pendingData?.length || 0;
+    }
+
+    // 3. 참석 여부 미선택 일정 수
+    const myClubIds = myMemberships.map(m => m.club_id);
+    const { data: upcomingEvents } = await supabase
+      .from('club_events')
+      .select('id')
+      .in('club_id', myClubIds)
+      .gte('date', new Date().toISOString().split('T')[0]);
+
+    if (upcomingEvents && upcomingEvents.length > 0) {
+      const eventIds = upcomingEvents.map(e => e.id);
+      const { data: myAttendances } = await supabase
+        .from('club_event_attendances')
+        .select('event_id')
+        .in('event_id', eventIds)
+        .eq('user_id', user.id);
+
+      const attendedEventIds = myAttendances?.map(a => a.event_id) || [];
+      const unselectedCount = eventIds.filter(id => !attendedEventIds.includes(id)).length;
+      count += unselectedCount;
+    }
+
+    setClubBadge(count);
+  };
+
+  useEffect(() => {
+    fetchClubBadge();
+  }, []);
+
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('lunch_tab') as Tab) || 'matching';
+    }
+    return 'matching';
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -32,12 +93,12 @@ export default function MainScreen({ user }: Props) {
         <div className="p-4 flex-1">
           <nav className="space-y-1">
           {[
-  { tab: 'matching', icon: '🎲', label: '매칭' },
-  { tab: 'calendar', icon: '📅', label: '캘린더' },
-  { tab: 'restaurant', icon: '🍜', label: '주변 음식점' },
-  { tab: 'club', icon: '🏃', label: '동아리' },
-  { tab: 'my', icon: '👤', label: 'My' },
-].map(({ tab, icon, label }) => (
+  { tab: 'matching', icon: '🎲', label: '매칭', badge: 0 },
+  { tab: 'calendar', icon: '📅', label: '캘린더', badge: 0 },
+  { tab: 'restaurant', icon: '🍜', label: '주변 음식점', badge: 0 },
+  { tab: 'club', icon: '🏃', label: '동아리', badge: clubBadge },
+  { tab: 'my', icon: '👤', label: 'My', badge: 0 },
+].map(({ tab, icon, label, badge }) => (
               <button
                 key={tab}
                 onClick={() => {
@@ -52,7 +113,12 @@ export default function MainScreen({ user }: Props) {
                 }`}
               >
                 <span className="text-xl">{icon}</span>
-                <span className="text-sm">{label}</span>
+                <span className="text-sm flex-1">{label}</span>
+                {badge > 0 && (
+                  <span className="w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                    {badge}
+                  </span>
+                )}
               </button>
             ))}
           </nav>
@@ -118,30 +184,18 @@ export default function MainScreen({ user }: Props) {
             </div>
           )}
 
-          {/* My 탭 */}
-          {activeTab === 'my' && (
-            <div className="max-w-md mx-auto md:mx-0 pt-4">
-              <h2 className="text-lg font-bold text-gray-800 mb-4">내 프로필</h2>
-              <div className="bg-white rounded-2xl p-5 shadow-sm space-y-3">
-                {[
-                  { label: '이름', value: user.name },
-                  { label: '성별', value: user.gender === '남' ? '남성' : '여성' },
-                  { label: '소속팀', value: user.team },
-                  { label: '직책', value: user.role },
-                  { label: '선호 음식', value: user.likes || '미입력' },
-                  { label: '비선호 음식', value: user.dislikes || '미입력' },
-                ].map(({ label, value }, i, arr) => (
-                  <div
-                    key={label}
-                    className={`flex justify-between items-center py-2 ${i < arr.length - 1 ? 'border-b border-gray-50' : ''}`}
-                  >
-                    <span className="text-sm text-gray-500">{label}</span>
-                    <span className="text-sm font-semibold text-gray-800">{value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+{/* My 탭 */}
+{activeTab === 'my' && (
+  <MyScreen
+    user={user}
+    onLogout={() => {
+      localStorage.removeItem('lunch_user');
+      localStorage.removeItem('lunch_tab');
+      window.location.reload();
+    }}
+    onPendingChange={() => fetchClubBadge()}
+  />
+)}
         </div>
       </div>
     </div>
