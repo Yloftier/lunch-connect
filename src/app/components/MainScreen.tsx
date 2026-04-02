@@ -3,8 +3,9 @@
 import React, { useState } from 'react';
 import MatchingScreen from './MatchingScreen';
 import CalendarScreen from './CalendarScreen';
+import ClubScreen from './ClubScreen';
 
-type Tab = 'matching' | 'calendar' | 'restaurant' | 'my';
+type Tab = 'matching' | 'calendar' | 'restaurant' | 'club' | 'my';
 
 interface Props {
   user: any;
@@ -25,17 +26,18 @@ export default function MainScreen({ user }: Props) {
       <div className="hidden md:flex flex-col w-64 bg-white border-r border-gray-100 fixed h-full">
         <div className="p-6 border-b border-gray-100">
           <span className="text-2xl">🍊</span>
-          <h1 className="text-lg font-black text-gray-800 mt-1">랭디 점심 커넥트</h1>
+          <h1 className="text-lg font-black text-gray-800 mt-1">랭디 커넥트</h1>
         </div>
 
         <div className="p-4 flex-1">
           <nav className="space-y-1">
-            {[
-              { tab: 'matching', icon: '🎲', label: '매칭' },
-              { tab: 'calendar', icon: '📅', label: '캘린더' },
-              { tab: 'restaurant', icon: '🍜', label: '주변 음식점' },
-              { tab: 'my', icon: '👤', label: 'My' },
-            ].map(({ tab, icon, label }) => (
+          {[
+  { tab: 'matching', icon: '🎲', label: '매칭' },
+  { tab: 'calendar', icon: '📅', label: '캘린더' },
+  { tab: 'restaurant', icon: '🍜', label: '주변 음식점' },
+  { tab: 'club', icon: '🏃', label: '동아리' },
+  { tab: 'my', icon: '👤', label: 'My' },
+].map(({ tab, icon, label }) => (
               <button
                 key={tab}
                 onClick={() => {
@@ -102,7 +104,10 @@ export default function MainScreen({ user }: Props) {
 {activeTab === 'calendar' && (
   <CalendarScreen user={user} />
 )}
-
+{/* 동아리 탭 */}
+{activeTab === 'club' && (
+  <ClubScreen user={user} />
+)}
           {/* 주변 음식점 탭 */}
           {activeTab === 'restaurant' && (
             <div className="flex flex-col items-center justify-center min-h-[60vh]">
