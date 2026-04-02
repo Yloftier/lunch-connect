@@ -54,22 +54,33 @@ export default function LoginScreen({ onExistingUser, onNewUser }: Props) {
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">이름</label>
             <input
-              required
-              className="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-orange-500 text-black"
-              placeholder="성함을 입력해주세요"
-              value={loginData.name}
-              onChange={(e) => setLoginData({...loginData, name: e.target.value})}
-            />
+  required
+  className="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-orange-500 text-black"
+  placeholder="성함을 입력해주세요"
+  maxLength={5}
+  value={loginData.name}
+  onChange={(e) => {
+    setLoginData({...loginData, name: e.target.value});
+  }}
+  onBlur={(e) => {
+    const val = e.target.value.replace(/[^가-힣\s]/g, '').slice(0, 5);
+    setLoginData({...loginData, name: val});
+  }}
+/>
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">생년월일 (8자리)</label>
             <input
-              required
-              className="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-orange-500 text-black"
-              placeholder="예: 19900522"
-              value={loginData.birth}
-              onChange={(e) => setLoginData({...loginData, birth: e.target.value})}
-            />
+  required
+  className="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-orange-500 text-black"
+  placeholder="예: 19990122"
+  maxLength={8}
+  value={loginData.birth}
+  onChange={(e) => {
+    const val = e.target.value.replace(/[^0-9]/g, '');
+    setLoginData({...loginData, birth: val});
+  }}
+/>
           </div>
           <button
             type="submit"

@@ -56,28 +56,33 @@ export default function MainScreen({ user }: Props) {
           </nav>
         </div>
 
-        {/* 사이드바 하단 유저 정보 */}
-        <div className="p-4 border-t border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-orange-100 rounded-full flex items-center justify-center text-orange-500 font-bold text-sm">
-              {user.name[0]}
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-gray-800">{user.name}</p>
-              <p className="text-xs text-gray-400">{user.team}</p>
-            </div>
-          </div>
-        </div>
+{/* 사이드바 하단 유저 정보 */}
+<div className="p-4 border-t border-gray-100">
+  <div className="flex items-center gap-3">
+    <div className="w-9 h-9 bg-orange-100 rounded-full flex items-center justify-center text-orange-500 font-bold text-sm">
+      {user.name[0]}
+    </div>
+    <div className="flex-1">
+      <p className="text-sm font-semibold text-gray-800">{user.name}</p>
+      <p className="text-xs text-gray-400">{user.team}</p>
+    </div>
+    <button
+      onClick={() => {
+        localStorage.removeItem('lunch_user');
+        localStorage.removeItem('lunch_tab');
+        window.location.reload();
+      }}
+      className="text-xs text-gray-400 hover:text-red-400 transition-all"
+      title="로그아웃"
+    >
+      🚪
+    </button>
+  </div>
+</div>
       </div>
 
       {/* ---- 메인 콘텐츠 영역 ---- */}
       <div className="flex-1 md:ml-64 pb-20 md:pb-0">
-
-        {/* 상단 헤더 (모바일만) */}
-        <div className="md:hidden px-5 pt-12 pb-4 bg-white border-b border-gray-100">
-          <p className="text-sm text-gray-400">안녕하세요 👋</p>
-          <h1 className="text-2xl font-black text-gray-900">{user.name}님</h1>
-        </div>
 
         {/* PC 상단 헤더 */}
         <div className="hidden md:block px-10 pt-10 pb-6">
@@ -134,28 +139,6 @@ export default function MainScreen({ user }: Props) {
           )}
         </div>
       </div>
-
-      {/* ---- 하단 GNB (모바일만) ---- */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around items-center px-2 py-2 z-50">
-        {[
-          { tab: 'matching', icon: '🎲', label: '매칭' },
-          { tab: 'calendar', icon: '📅', label: '캘린더' },
-          { tab: 'restaurant', icon: '🍜', label: '주변 음식점' },
-          { tab: 'my', icon: '👤', label: 'My' },
-        ].map(({ tab, icon, label }) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab as Tab)}
-            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all ${
-              activeTab === tab ? 'text-orange-500' : 'text-gray-400'
-            }`}
-          >
-            <span className="text-2xl">{icon}</span>
-            <span className="text-xs font-semibold">{label}</span>
-          </button>
-        ))}
-      </div>
-
     </div>
   );
 }
