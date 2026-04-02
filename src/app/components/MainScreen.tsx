@@ -11,7 +11,12 @@ interface Props {
 }
 
 export default function MainScreen({ user }: Props) {
-  const [activeTab, setActiveTab] = useState<Tab>('matching');
+    const [activeTab, setActiveTab] = useState<Tab>(() => {
+        if (typeof window !== 'undefined') {
+          return (localStorage.getItem('lunch_tab') as Tab) || 'matching';
+        }
+        return 'matching';
+      });
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -33,7 +38,11 @@ export default function MainScreen({ user }: Props) {
             ].map(({ tab, icon, label }) => (
               <button
                 key={tab}
-                onClick={() => setActiveTab(tab as Tab)}
+                onClick={() => {
+                    const t = tab as Tab;
+                    localStorage.setItem('lunch_tab', t);
+                    setActiveTab(t);
+                  }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left ${
                   activeTab === tab
                     ? 'bg-orange-50 text-orange-500 font-bold'

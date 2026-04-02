@@ -68,8 +68,10 @@ export default function CalendarScreen({ user }: Props) {
   const month = currentDate.getMonth();
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const calendarDays = Array.from({ length: firstDay }, () => null)
-    .concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
+  const calendarDays: (number | null)[] = [
+    ...Array.from({ length: firstDay }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1)
+  ];
 
   const fetchEvents = async () => {
     const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`;
@@ -346,51 +348,58 @@ setMonthStats({ total: completed, myTurn: myGroupCount });
               </div>
             )}
 
-            {/* 후기 */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-gray-400">후기</p>
-                {matchingGroup?.members?.some((m: any) => m.id === user.id) && reviews.length === 0 && (
-                  <button onClick={() => setShowReviewForm(!showReviewForm)}
-                    className="text-xs text-orange-500 font-semibold">+ 작성</button>
-                )}
-              </div>
+          {/* 후기 */}
+<div className="mb-4">
+  <div className="flex items-center justify-between mb-2">
+    <p className="text-xs text-gray-400">후기</p>
+    {/* 매칭그룹 멤버만 작성 가능 */}
+    {matchingGroup?.members?.some((m: any) => m.id === user.id) && reviews.length === 0 && (
+      <button onClick={() => setShowReviewForm(!showReviewForm)}
+        className="text-xs text-orange-500 font-semibold">+ 작성</button>
+    )}
+  </div>
 
-              {showReviewForm && (
-                <div className="bg-orange-50 rounded-xl p-3 mb-3 space-y-2">
-                  <input
-                    className="w-full p-2 border rounded-lg text-xs text-black outline-none focus:ring-2 focus:ring-orange-400"
-                    placeholder="식당 이름"
-                    value={newReview.restaurant}
-                    onChange={(e) => setNewReview({...newReview, restaurant: e.target.value})}
-                  />
-                  <textarea
-                    className="w-full p-2 border rounded-lg text-xs text-black outline-none focus:ring-2 focus:ring-orange-400 resize-none"
-                    placeholder="오늘 점심 어땠나요?"
-                    rows={3}
-                    value={newReview.content}
-                    onChange={(e) => setNewReview({...newReview, content: e.target.value})}
-                  />
-                  <button onClick={handleAddReview}
-                    className="w-full bg-orange-500 text-white py-2 rounded-lg text-xs font-bold">등록</button>
-                </div>
-              )}
+  {/* 비멤버에게 disabled 안내 */}
+  {!matchingGroup?.members?.some((m: any) => m.id === user.id) && (
+    <div className="bg-gray-50 rounded-xl p-3 mb-2 text-center">
+      <p className="text-xs text-gray-300">오늘 참여한 사람만 작성 가능해요</p>
+    </div>
+  )}
 
-              {reviews.length > 0 ? reviews.map(review => (
-                <div key={review.id} className="bg-gray-50 rounded-xl p-3 mb-2">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-bold text-gray-700">{review.author?.name}</span>
-                    {review.restaurant && (
-                      <span className="text-xs text-orange-500">📍 {review.restaurant}</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-600">{review.content}</p>
-                </div>
-              )) : (
-                <p className="text-xs text-gray-300 text-center py-2">아직 후기가 없어요</p>
-              )}
-            </div>
+  {showReviewForm && matchingGroup?.members?.some((m: any) => m.id === user.id) && (
+    <div className="bg-orange-50 rounded-xl p-3 mb-3 space-y-2">
+      <input
+        className="w-full p-2 border rounded-lg text-xs text-black outline-none focus:ring-2 focus:ring-orange-400"
+        placeholder="식당 이름"
+        value={newReview.restaurant}
+        onChange={(e) => setNewReview({...newReview, restaurant: e.target.value})}
+      />
+      <textarea
+        className="w-full p-2 border rounded-lg text-xs text-black outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+        placeholder="오늘 점심 어땠나요?"
+        rows={3}
+        value={newReview.content}
+        onChange={(e) => setNewReview({...newReview, content: e.target.value})}
+      />
+      <button onClick={handleAddReview}
+        className="w-full bg-orange-500 text-white py-2 rounded-lg text-xs font-bold">등록</button>
+    </div>
+  )}
 
+  {reviews.length > 0 ? reviews.map(review => (
+    <div key={review.id} className="bg-gray-50 rounded-xl p-3 mb-2">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-xs font-bold text-gray-700">{review.author?.name}</span>
+        {review.restaurant && (
+          <span className="text-xs text-orange-500">📍 {review.restaurant}</span>
+        )}
+      </div>
+      <p className="text-xs text-gray-600">{review.content}</p>
+    </div>
+  )) : matchingGroup?.members?.some((m: any) => m.id === user.id) ? (
+    <p className="text-xs text-gray-300 text-center py-2">아직 후기가 없어요. 첫 후기를 남겨보세요!</p>
+  ) : null}
+</div>
             {/* 댓글 */}
             <div>
               <p className="text-xs text-gray-400 mb-2">댓글 {comments.length > 0 ? `(${comments.length})` : ''}</p>
