@@ -63,6 +63,7 @@ export default function CalendarScreen({ user }: Props) {
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [monthStats, setMonthStats] = useState({ total: 0, myTurn: 0 });
+  const [restaurantMap, setRestaurantMap] = useState<Record<string, string>>({});
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -86,6 +87,28 @@ export default function CalendarScreen({ user }: Props) {
 
     setEvents(eventData || []);
 
+    setEvents(eventData || []);
+
+    // 후기에서 식당 이름 불러오기
+    const groupIds = (eventData || [])
+      .filter(e => e.matching_group_id)
+      .map(e => e.matching_group_id);
+    
+    if (groupIds.length > 0) {
+      const { data: reviewData } = await supabase
+        .from('matching_reviews')
+        .select('matching_group_id, restaurant')
+        .in('matching_group_id', groupIds);
+      setRestaurantMap(
+        Object.fromEntries(
+          (reviewData || [])
+            .filter(r => r.restaurant)
+            .map(r => [r.matching_group_id, r.restaurant])
+        )
+      );
+    }
+    
+    
     // matching_turns 불러오기 (매칭자 이름 포함)
     const { data: turnData } = await supabase
     .from('matching_turns')
@@ -281,12 +304,24 @@ setMonthStats({ total: completed, myTurn: myGroupCount });
                 >
                   <span className={`text-sm font-bold ${getDateColor()}`}>{day}</span>
                   {/* 매칭자 이름 */}
-                  {turn && (
-                    <span className={`text-xs mt-0.5 font-medium truncate w-full text-center px-1
-                      ${isSelected ? 'text-white' : turn.status === '완료' ? 'text-orange-500' : 'text-gray-400'}`}>
-                      {(turn.matcher as any)?.name}
-                    </span>
-                  )}
+{/* 매칭자 이름 */}
+{turn && (
+  <span className={`text-xs mt-0.5 font-medium truncate w-full text-center px-1
+    ${isSelected ? 'text-white' : turn.status === '완료' ? 'text-orange-500' : 'text-gray-400'}`}>
+    {(turn.matcher as any)?.name}
+  </span>
+)}
+{/* 식당 이름 */}
+{turn && turn.status === '완료' && (() => {
+  const event = events.find(e => e.date === dateStr);
+  const restaurant = event ? restaurantMap[event.matching_group_id] : null;
+  return restaurant ? (
+    <span className={`text-xs truncate w-full text-center px-1
+      ${isSelected ? 'text-orange-100' : 'text-gray-400'}`}>
+      📍 {restaurant}
+    </span>
+  ) : null;
+})()}
                 </button>
               );
             })}
