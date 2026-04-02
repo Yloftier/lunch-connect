@@ -9,8 +9,20 @@ import MainScreen from './components/MainScreen';
 type Screen = 'login' | 'onboarding_gender' | 'onboarding_detail' | 'main';
 
 export default function Home() {
-  const [screen, setScreen] = useState<Screen>('login');
-  const [user, setUser] = useState<any>(null);
+  const [screen, setScreen] = useState<Screen>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lunch_user');
+      return saved ? 'main' : 'login';
+    }
+    return 'login';
+  });
+  const [user, setUser] = useState<any>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lunch_user');
+      return saved ? JSON.parse(saved) : null;
+    }
+    return null;
+  });
   const [loginData, setLoginData] = useState({ name: '', birth: '' });
   const [gender, setGender] = useState('');
 
@@ -18,7 +30,11 @@ export default function Home() {
     <>
       {screen === 'login' && (
         <LoginScreen
-          onExistingUser={(user) => { setUser(user); setScreen('main'); }}
+        onExistingUser={(user) => { 
+          localStorage.setItem('lunch_user', JSON.stringify(user));
+          setUser(user); 
+          setScreen('main'); 
+        }}
           onNewUser={(data) => { setLoginData(data); setScreen('onboarding_gender'); }}
         />
       )}
@@ -34,7 +50,11 @@ export default function Home() {
         <OnboardingDetail
           loginData={loginData}
           gender={gender}
-          onComplete={(user) => { setUser(user); setScreen('main'); }}
+          onComplete={(user) => { 
+            localStorage.setItem('lunch_user', JSON.stringify(user));
+            setUser(user); 
+            setScreen('main'); 
+          }}
         />
       )}
 
