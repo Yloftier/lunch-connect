@@ -1,0 +1,164 @@
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+export async function POST(req: Request) {
+  try {
+    const { matcherId, groupSize } = await req.json();
+    const today = new Date().toISOString().split('T')[0];
+
+    // 1. 오늘 매칭자 확인
+    const { data: turnData } = await supabase
+      .from('matching_turns')
+      .select('*')
+      .eq('date', today)
+      .single();
+
+    if (!turnData) {
+      return NextResponse.json({ error: '오늘 매칭자 정보가 없어요.' }, { status: 400 });
+    }
+
+    if (turnData.matcher_id !== matcherId) {
+      return NextResponse.json({ error: '오늘 매칭 권한이 없어요.' }, { status: 403 });
+    }
+
+    if (turnData.status === '완료') {
+      return NextResponse.json({ error: '오늘 매칭이 이미 완료됐어요.' }, { status: 400 });
+    }
+
+    // 2. 매칭자 정보 가져오기
+    const { data: matcher } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', matcherId)
+      .single();
+
+    if (!matcher) {
+      return NextResponse.json({ error: '매칭자 정보를 찾을 수 없어요.' }, { status: 400 });
+    }
+
+    // 3. 매칭대기자 가져오기 (매칭자 제외, 매칭 횟수 적은 순)
+    const { data: allUsers } = await supabase
+      .from('users')
+      .select('*')
+      .neq('id', matcherId);
+
+    if (!allUsers || allUsers.length < groupSize - 1) {
+      return NextResponse.json({ error: '매칭할 수 있는 인원이 부족해요.' }, { status: 400 });
+    }
+
+    // 4. 매칭 로직 (성별 혼합 필수)
+    const matcherGender = matcher.gender;
+    const otherGender = matcherGender === '남' ? '여' : '남';
+
+    // 다른 성별 먼저 분리
+    const otherGenderUsers = allUsers.filter(u => u.gender === otherGender);
+    const sameGenderUsers = allUsers.filter(u => u.gender === matcherGender);
+
+    if (otherGenderUsers.length === 0) {
+      return NextResponse.json({ error: '다른 성별 인원이 없어서 매칭이 어려워요.' }, { status: 400 });
+    }
+
+    // 다른 성별에서 최소 1명 반드시 선택
+    const shuffledOther = otherGenderUsers.sort(() => 0.5 - Math.random());
+    const shuffledSame = sameGenderUsers.sort(() => 0.5 - Math.random());
+
+    let selectedMembers = [];
+
+    if (groupSize === 2) {
+      // 2명: 매칭자 + 다른 성별 1명
+      selectedMembers = [shuffledOther[0]];
+    } else {
+      // 3명: 매칭자 + 다른 성별 1명 + 나머지 1명 (성별 무관)
+      const remaining = [...shuffledOther.slice(1), ...shuffledSame].sort(() => 0.5 - Math.random());
+      selectedMembers = [shuffledOther[0], remaining[0]];
+    }
+
+    const matchingGroup = [matcher, ...selectedMembers];
+
+    // 5. 매칭 결과 저장
+    await supabase
+      .from('matching_groups')
+      .insert([{
+        date: today,
+        matcher_id: matcherId,
+        members: matchingGroup.map(u => ({
+          id: u.id,
+          name: u.name,
+          team: u.team,
+          role: u.role,
+          gender: u.gender
+        }))
+      }]);
+
+    // 6. 매칭자 status 완료로 업데이트
+    await supabase
+      .from('matching_turns')
+      .update({ status: '완료' })
+      .eq('date', today);
+
+    return NextResponse.json({ success: true, matchingGroup });
+
+  } catch (error) {
+    console.error('매칭 오류:', error);
+    return NextResponse.json({ error: '매칭 중 오류가 발생했어요.' }, { status: 500 });
+  }
+}
+
+// 오늘 매칭 현황 조회
+export async function GET() {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+
+    // 오늘 매칭자
+    const { data: turnData } = await supabase
+    .from('matching_turns')
+    .select('*')
+    .eq('date', today)
+    .single();
+  
+  const matcherInfo = turnData ? await supabase
+    .from('users')
+    .select('id, name, team, gender')
+    .eq('id', turnData.matcher_id)
+    .single() : null;
+
+    // 오늘 매칭 결과
+    const { data: groupData } = await supabase
+      .from('matching_groups')
+      .select('*')
+      .eq('date', today)
+      .single();
+
+    // 내일 매칭자 (매칭 횟수 가장 적은 사람)
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+    const { data: tomorrowTurn } = await supabase
+      .from('matching_turns')
+      .select('*, matcher:matcher_id(id, name, team)')
+      .eq('date', tomorrowStr)
+      .single();
+
+      return NextResponse.json({
+        today: {
+          matcher: matcherInfo?.data ?? null,
+          status: turnData?.status ?? null,
+          group: groupData?.members ?? null,
+          matcherId: turnData?.matcher_id ?? null,
+        },
+      tomorrow: {
+        matcher: tomorrowTurn?.matcher ?? null,
+      }
+    });
+
+  } catch (error) {
+    console.error('조회 오류:', error);
+    return NextResponse.json({ error: '조회 중 오류가 발생했어요.' }, { status: 500 });
+  }
+}
