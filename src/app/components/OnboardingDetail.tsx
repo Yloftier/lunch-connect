@@ -20,6 +20,7 @@ export default function OnboardingDetail({ loginData, gender, onComplete }: Prop
   const [formData, setFormData] = useState({
     team: TEAMS[0],
     role: '팀원',
+    slack_email: '',
     likes: '',
     dislikes: ''
   });
@@ -37,6 +38,7 @@ export default function OnboardingDetail({ loginData, gender, onComplete }: Prop
           gender,
           team: formData.team,
           role: formData.role,
+          slack_email: formData.slack_email,
           likes: formData.likes,
           dislikes: formData.dislikes
         }])
@@ -87,6 +89,19 @@ export default function OnboardingDetail({ loginData, gender, onComplete }: Prop
                 <option value="팀장">팀장</option>
               </select>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">사내 이메일 📧</label>
+            <input
+              required
+              type="email"
+              className="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-orange-500 text-black"
+              placeholder="예: taeyoung@company.com"
+              value={formData.slack_email}
+              onChange={(e) => setFormData({...formData, slack_email: e.target.value})}
+            />
+            <p className="text-xs text-gray-400 mt-1">슬랙 알림을 받을 이메일이에요</p>
           </div>
 
           <div>
