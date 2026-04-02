@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+body {
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+}
+
 :root {
   color-scheme: light;
 }
