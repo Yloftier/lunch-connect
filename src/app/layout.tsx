@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "런넥트",
-  description: "사내 점심 매칭 서비스"
+  description: "함께의 즐거움, 런넥트"
 };
 
 export default function RootLayout({
