@@ -4,10 +4,11 @@ import React, { useEffect, useState } from 'react';
 import MatchingScreen from './MatchingScreen';
 import CalendarScreen from './CalendarScreen';
 import ClubScreen from './ClubScreen';
+import HomeScreen from './HomeScreen';
 import { supabase } from '../lib/supabase';
 import MyScreen from './MyScreen';
 
-type Tab = 'matching' | 'calendar' | 'restaurant' | 'club' | 'my';
+type Tab = 'home' | 'matching' | 'calendar' | 'club' | 'restaurant' | 'my';
 
 interface Props {
   user: any;
@@ -75,8 +76,7 @@ export default function MainScreen({ user }: Props) {
 
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('lunch_tab') as Tab) || 'matching';
-    }
+      return (localStorage.getItem('lunch_tab') as Tab) || 'home';    }
     return 'matching';
   });
 
@@ -93,11 +93,12 @@ export default function MainScreen({ user }: Props) {
         <div className="p-4 flex-1">
           <nav className="space-y-1">
           {[
-  { tab: 'matching', icon: '🎲', label: '매칭', badge: 0 },
-  { tab: 'calendar', icon: '📅', label: '캘린더', badge: 0 },
-  { tab: 'restaurant', icon: '🍜', label: '주변 음식점', badge: 0 },
-  { tab: 'club', icon: '🏃', label: '동아리', badge: clubBadge },
-  { tab: 'my', icon: '👤', label: 'My', badge: 0 },
+{ tab: 'home', icon: '🏠', label: '홈', badge: 0 },
+{ tab: 'matching', icon: '🎲', label: '매칭', badge: 0 },
+{ tab: 'calendar', icon: '📅', label: '캘린더', badge: 0 },
+{ tab: 'club', icon: '🏃', label: '동아리', badge: clubBadge },
+{ tab: 'restaurant', icon: '🍜', label: '주변 음식점', badge: 0 },
+{ tab: 'my', icon: '👤', label: 'My', badge: 0 },
 ].map(({ tab, icon, label, badge }) => (
               <button
                 key={tab}
@@ -160,6 +161,11 @@ export default function MainScreen({ user }: Props) {
 
         {/* 탭 콘텐츠 */}
         <div className="px-5 md:px-10">
+
+{/* 홈 탭 */}
+{activeTab === 'home' && (
+  <HomeScreen user={user} />
+)}
 
           {/* 매칭 탭 */}
 {activeTab === 'matching' && (

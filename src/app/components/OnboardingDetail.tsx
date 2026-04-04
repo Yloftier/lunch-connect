@@ -16,7 +16,7 @@ const FOOD_CATEGORIES = [
 ];
 
 interface Props {
-  loginData: { name: string; birth: string };
+  loginData: { name: string; birth: string; password: string };
   gender: string;
   onComplete: (user: any) => void;
 }
@@ -83,7 +83,8 @@ export default function OnboardingDetail({ loginData, gender, onComplete }: Prop
           role: formData.role,
           slack_email: formData.slack_email,
           likes: likes.join(', '),
-          dislikes: dislikes.join(', ')
+          dislikes: dislikes.join(', '),
+          password: loginData.password,
         }])
         .select()
         .single();

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import LoginScreen from './components/LoginScreen';
 import OnboardingGender from './components/OnboardingGender';
 import OnboardingDetail from './components/OnboardingDetail';
@@ -9,21 +9,17 @@ import MainScreen from './components/MainScreen';
 type Screen = 'login' | 'onboarding_gender' | 'onboarding_detail' | 'main';
 
 export default function Home() {
-  const [screen, setScreen] = useState<Screen>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('lunch_user');
-      return saved ? 'main' : 'login';
+  const [screen, setScreen] = useState<Screen>('login');
+  const [user, setUser] = useState<any>(null);
+  
+  useEffect(() => {
+    const saved = localStorage.getItem('lunch_user');
+    if (saved) {
+      setUser(JSON.parse(saved));
+      setScreen('main');
     }
-    return 'login';
-  });
-  const [user, setUser] = useState<any>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('lunch_user');
-      return saved ? JSON.parse(saved) : null;
-    }
-    return null;
-  });
-  const [loginData, setLoginData] = useState({ name: '', birth: '' });
+  }, []);
+  const [loginData, setLoginData] = useState({ name: '', birth: '', password: '' });
   const [gender, setGender] = useState('');
 
   return (
