@@ -64,6 +64,7 @@ export default function CalendarScreen({ user }: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [monthStats, setMonthStats] = useState({ total: 0, myTurn: 0 });
   const [restaurantMap, setRestaurantMap] = useState<Record<string, string>>({});
+  const [birthdayMap, setBirthdayMap] = useState<Record<string, string[]>>({});
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -148,7 +149,22 @@ const uniqueDates = new Set(
   );
   const myGroupCount = uniqueDates.size;
 
-setMonthStats({ total: completed, myTurn: myGroupCount });
+// 생일자 불러오기
+const { data: allUsers } = await supabase
+  .from('users')
+  .select('id, name, birth');
+
+const bMap: Record<string, string[]> = {};
+(allUsers || []).forEach(u => {
+  if (!u.birth || u.birth.length !== 8) return;
+  const monthDay = u.birth.slice(4, 8);
+  const dateKey = `${year}-${u.birth.slice(4, 6)}-${u.birth.slice(6, 8)}`;
+  if (!bMap[dateKey]) bMap[dateKey] = [];
+  bMap[dateKey].push(u.name);
+});
+setBirthdayMap(bMap);
+
+  setMonthStats({ total: completed, myTurn: myGroupCount });
   };
 
   const fetchDateDetail = async (dateStr: string) => {
@@ -311,6 +327,15 @@ setMonthStats({ total: completed, myTurn: myGroupCount });
     {(turn.matcher as any)?.name}
   </span>
 )}
+
+{/* 생일 도트 */}
+{birthdayMap[dateStr] && (
+  <span className={`text-xs truncate w-full text-center px-1
+    ${isSelected ? 'text-white' : 'text-yellow-500'}`}>
+    🎂 {birthdayMap[dateStr].join(', ')}
+  </span>
+)}
+
 {/* 식당 이름 */}
 {turn && turn.status === '완료' && (() => {
   const event = events.find(e => e.date === dateStr);
@@ -346,6 +371,17 @@ setMonthStats({ total: completed, myTurn: myGroupCount });
         <h3 className="font-bold text-gray-800 mb-1 text-sm">
           {selectedDate ? formatDate(selectedDate) : '날짜를 선택해주세요'}
         </h3>
+
+{/* 생일자 표시 */}
+{selectedDate && birthdayMap[selectedDate] && (
+  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-3 flex items-center gap-2">
+    <span className="text-lg">🎂</span>
+    <div>
+      <p className="text-xs font-bold text-yellow-600">오늘의 생일자</p>
+      <p className="text-sm font-bold text-gray-800">{birthdayMap[selectedDate].join(', ')}님</p>
+    </div>
+  </div>
+)}
 
         {/* 매칭자 표시 */}
         {selectedTurn && (

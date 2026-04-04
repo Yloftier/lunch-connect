@@ -7,8 +7,9 @@ import ClubScreen from './ClubScreen';
 import HomeScreen from './HomeScreen';
 import { supabase } from '../lib/supabase';
 import MyScreen from './MyScreen';
+import PeopleScreen from './PeopleScreen';
 
-type Tab = 'home' | 'matching' | 'calendar' | 'club' | 'restaurant' | 'my';
+type Tab = 'home' | 'people' | 'matching' | 'calendar' | 'club' | 'restaurant' | 'my';
 
 interface Props {
   user: any;
@@ -94,6 +95,7 @@ export default function MainScreen({ user }: Props) {
           <nav className="space-y-1">
           {[
 { tab: 'home', icon: '🏠', label: '홈', badge: 0 },
+{ tab: 'people', icon: '👥', label: '피플', badge: 0 },
 { tab: 'matching', icon: '🎲', label: '매칭', badge: 0 },
 { tab: 'calendar', icon: '📅', label: '캘린더', badge: 0 },
 { tab: 'club', icon: '🏃', label: '동아리', badge: clubBadge },
@@ -165,6 +167,11 @@ export default function MainScreen({ user }: Props) {
 {/* 홈 탭 */}
 {activeTab === 'home' && (
   <HomeScreen user={user} />
+)}
+
+{/* 피플 탭 */}
+{activeTab === 'people' && (
+  <PeopleScreen user={user} />
 )}
 
           {/* 매칭 탭 */}

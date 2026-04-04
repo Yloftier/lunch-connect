@@ -4,9 +4,9 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 const TEAMS = [
-  "경영지원팀", "사업팀-일본어", "사업팀-중국어", "사업팀-영어", 
-  "마케팅팀-영상", "마케팅팀-마케팅", "cscx팀", "사업팀-일본시장", 
-  "제품개발팀-기획디자인", "제품개발팀-F/E", "제품개발팀-B/E"
+  "제품개발팀", "마케팅팀",
+  "사업팀-영어", "사업팀-중국어", "사업팀-일본어", "사업팀-일본시장",
+  "cscx팀", "경영지원팀"
 ];
 
 const FOOD_CATEGORIES = [

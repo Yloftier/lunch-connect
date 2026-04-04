@@ -29,6 +29,7 @@ const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 export default function HomeScreen({ user }: Props) {
   const [weekSchedules, setWeekSchedules] = useState<DaySchedule[]>([]);
+  const [birthdayUsers, setBirthdayUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchWeekData = async () => {
@@ -37,11 +38,19 @@ export default function HomeScreen({ user }: Props) {
     const today = new Date();
     const days: DaySchedule[] = [];
 
-    for (let i = 0; i < 7; i++) {
+    let count = 0;
+    let i = 0;
+    while (count < 7) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
-      const dateStr = date.toISOString().split('T')[0];
-      days.push({ date, dateStr, clubEvents: [] });
+      const dayOfWeek = date.getDay();
+      // 주말 제외 (0=일, 6=토)
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        const dateStr = date.toISOString().split('T')[0];
+        days.push({ date, dateStr, clubEvents: [] });
+        count++;
+      }
+      i++;
     }
 
     const startDate = days[0].dateStr;
@@ -122,8 +131,19 @@ export default function HomeScreen({ user }: Props) {
       };
     });
 
-    setWeekSchedules(result);
-    setIsLoading(false);
+// 이달의 생일자
+const thisMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+const { data: allUsers } = await supabase
+  .from('users')
+  .select('id, name, birth, team');
+
+const birthdays = (allUsers || []).filter(u => 
+  u.birth && u.birth.length === 8 && u.birth.slice(4, 6) === thisMonth
+).sort((a, b) => a.birth.slice(6, 8).localeCompare(b.birth.slice(6, 8)));
+
+setBirthdayUsers(birthdays);
+setWeekSchedules(result);
+setIsLoading(false);
   };
 
   useEffect(() => { fetchWeekData(); }, []);
@@ -148,13 +168,50 @@ export default function HomeScreen({ user }: Props) {
 
   return (
     <div className="p-6 max-w-4xl">
-      {/* 헤더 */}
-      <div className="mb-6">
-        <p className="text-sm text-gray-400">안녕하세요 👋</p>
-        <h1 className="text-2xl font-black text-gray-900">
-          {user.name}님, 이번 주 일정이에요!
-        </h1>
-      </div>
+{/* 헤더 */}
+<div className="mb-6">
+  <p className="text-sm text-gray-400">안녕하세요 👋</p>
+  <h1 className="text-2xl font-black text-gray-900">
+    {user.name}님, 이번 주 일정이에요!
+  </h1>
+</div>
+
+{/* 이달의 생일자 */}
+{birthdayUsers.length > 0 && (
+  <div className="bg-white rounded-2xl p-5 shadow-sm mb-6 border-2 border-yellow-200">
+    <div className="flex items-center gap-2 mb-3">
+      <span className="text-xl">🎂</span>
+      <p className="font-black text-gray-800">
+        {new Date().getMonth() + 1}월의 생일자
+      </p>
+      <span className="text-xs bg-yellow-100 text-yellow-600 px-2 py-0.5 rounded-full font-bold">
+        {birthdayUsers.length}명
+      </span>
+    </div>
+    <div className="flex flex-wrap gap-2">
+      {birthdayUsers.map(u => {
+        const isToday = u.birth.slice(4, 8) === String(new Date().getMonth() + 1).padStart(2, '0') + String(new Date().getDate()).padStart(2, '0');
+        const day = u.birth.slice(6, 8);
+        return (
+          <div key={u.id}
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl
+              ${isToday ? 'bg-yellow-400 text-white' : 'bg-yellow-50 text-gray-700'}`}>
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-sm
+              ${isToday ? 'bg-white text-yellow-500' : 'bg-yellow-200 text-yellow-600'}`}>
+              {u.name[0]}
+            </div>
+            <div>
+              <p className="text-sm font-bold">{u.name} {isToday ? '🎉' : ''}</p>
+              <p className={`text-xs ${isToday ? 'text-yellow-100' : 'text-gray-400'}`}>
+                {parseInt(day)}일 · {u.team}
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+)}
 
       {/* 이번 주 일정 */}
       <div className="space-y-3">
