@@ -8,6 +8,7 @@ import HomeScreen from './HomeScreen';
 import { supabase } from '../lib/supabase';
 import MyScreen from './MyScreen';
 import PeopleScreen from './PeopleScreen';
+import RestaurantScreen from './RestaurantScreen';
 
 type Tab = 'home' | 'people' | 'matching' | 'calendar' | 'club' | 'restaurant' | 'my';
 
@@ -187,15 +188,10 @@ export default function MainScreen({ user }: Props) {
 {activeTab === 'club' && (
   <ClubScreen user={user} />
 )}
-          {/* 주변 음식점 탭 */}
-          {activeTab === 'restaurant' && (
-            <div className="flex flex-col items-center justify-center min-h-[60vh]">
-              <span className="text-5xl mb-4">🍜</span>
-              <h2 className="text-xl font-bold text-gray-700">주변 음식점</h2>
-              <p className="text-gray-400 text-sm mt-2">팀원 추천 맛집이 여기에 쌓여요</p>
-              <p className="text-xs text-orange-400 mt-4 bg-orange-50 px-4 py-2 rounded-full">준비 중이에요 🛠️</p>
-            </div>
-          )}
+{/* 주변 음식점 탭 */}
+{activeTab === 'restaurant' && (
+  <RestaurantScreen user={user} />
+)}
 
 {/* My 탭 */}
 {activeTab === 'my' && (
