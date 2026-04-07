@@ -84,9 +84,13 @@ export default function RestaurantScreen({ user }: Props) {
   const [isLoadingGoogleReviews, setIsLoadingGoogleReviews] = useState(false);
   const [myReviewMap, setMyReviewMap] = useState<Record<string, boolean>>({});
   const [allReviews, setAllReviews] = useState<MyReview[]>([]);
+  const [searchInput, setSearchInput] = useState('');
+  const [activeSearch, setActiveSearch] = useState('');
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const miniMapRef = useRef<HTMLDivElement>(null);
+  const miniMapInstanceRef = useRef<any>(null);
 
   const fetchRestaurants = async (keyword: string = '') => {
     setIsLoading(true);
@@ -236,8 +240,73 @@ export default function RestaurantScreen({ user }: Props) {
     document.head.appendChild(script);
   }, []);
 
+  // 모달 미니맵 초기화
+  useEffect(() => {
+    if (!showReviewModal || !selectedRestaurant?.lat || !selectedRestaurant?.lng) return;
+
+    const initMiniMap = () => {
+      if (!miniMapRef.current) return;
+      const google = (window as any).google;
+      if (!google?.maps) return;
+
+      // 기존 인스턴스 초기화
+      miniMapInstanceRef.current = null;
+
+      const map = new google.maps.Map(miniMapRef.current, {
+        center: { lat: selectedRestaurant.lat!, lng: selectedRestaurant.lng! },
+        zoom: 17,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        zoomControl: false,
+        styles: [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }],
+      });
+
+      // 오피스 마커
+      new google.maps.Marker({
+        position: { lat: OFFICE_LAT, lng: OFFICE_LNG },
+        map,
+        title: '랭디 오피스',
+        icon: {
+          url: '/Langdy.png',
+          scaledSize: new google.maps.Size(28, 28),
+          anchor: new google.maps.Point(14, 14),
+        },
+        zIndex: 999,
+      });
+
+      // 식당 마커
+      new google.maps.Marker({
+        position: { lat: selectedRestaurant.lat!, lng: selectedRestaurant.lng! },
+        map,
+        title: selectedRestaurant.name,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: '#f97316',
+          fillOpacity: 1,
+          strokeColor: '#fff',
+          strokeWeight: 2,
+        },
+        zIndex: 998,
+      });
+
+      miniMapInstanceRef.current = map;
+    };
+
+    // 약간의 지연 후 초기화 (DOM 마운트 대기)
+    const timer = setTimeout(initMiniMap, 100);
+    return () => clearTimeout(timer);
+  }, [showReviewModal, selectedRestaurant]);
+
   useEffect(() => { fetchRestaurants(); fetchMyReviews(); }, []);
-  useEffect(() => { fetchRestaurants(selectedCategory); }, [selectedCategory]);
+  useEffect(() => {
+    if (selectedCategory) {
+      setSearchInput('');
+      setActiveSearch('');
+      fetchRestaurants(selectedCategory);
+    }
+  }, [selectedCategory]);
 
   const handleSelectRestaurant = async (restaurant: Restaurant) => {
     setSelectedRestaurant(restaurant);
@@ -277,6 +346,19 @@ export default function RestaurantScreen({ user }: Props) {
     await fetchMyReviews();
   };
 
+  const handleSearch = () => {
+    if (!searchInput.trim()) return;
+    setActiveSearch(searchInput.trim());
+    setSelectedCategory('');
+    fetchRestaurants(searchInput.trim());
+  };
+
+  const handleClearSearch = () => {
+    setSearchInput('');
+    setActiveSearch('');
+    fetchRestaurants('');
+  };
+
   const getPhotoUrl = (photoRef: string) => `/api/places/photo?ref=${photoRef}`;
 
   const getPriceLevel = (level?: string) => {
@@ -296,13 +378,54 @@ export default function RestaurantScreen({ user }: Props) {
       <div className="px-6 pt-6 pb-4 bg-white border-b border-gray-100">
         <h1 className="text-2xl font-black text-gray-900 mb-1">주변 음식점 🍜</h1>
         <p className="text-sm text-gray-400">낙성대역 4번출구 주변 맛집이에요!</p>
+
+        {/* 검색 입력 */}
+        <div className="flex gap-2 mt-3">
+          <div className="relative flex-1">
+            <input
+              className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-black outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all"
+              placeholder="식당 이름이나 음식 종류로 검색..."
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSearch()}
+            />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+            {searchInput && (
+              <button
+                onClick={handleClearSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 text-sm font-bold"
+              >✕</button>
+            )}
+          </div>
+          <button
+            onClick={handleSearch}
+            disabled={!searchInput.trim() || isLoading}
+            className="px-4 py-2.5 bg-orange-500 text-white rounded-xl text-sm font-bold hover:bg-orange-600 transition-all disabled:opacity-40"
+          >
+            검색
+          </button>
+        </div>
+
+        {/* 활성 검색어 표시 */}
+        {activeSearch && (
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-xs text-gray-400">검색결과:</span>
+            <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
+              {activeSearch}
+              <button onClick={handleClearSearch} className="hover:text-red-400">✕</button>
+            </span>
+            <span className="text-xs text-gray-400">{restaurants.length}개</span>
+          </div>
+        )}
+
+        {/* 카테고리 필터 */}
         <div className="flex gap-2 flex-wrap mt-3">
           {CATEGORIES.map(cat => (
             <button
               key={cat.value}
               onClick={() => setSelectedCategory(cat.value)}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all
-                ${selectedCategory === cat.value
+                ${selectedCategory === cat.value && !activeSearch
                   ? 'bg-orange-500 text-white'
                   : 'bg-gray-100 text-gray-500 hover:bg-orange-50 hover:text-orange-500'}`}
             >
@@ -432,6 +555,25 @@ export default function RestaurantScreen({ user }: Props) {
                 ✕
               </button>
             </div>
+
+            {/* 미니맵 */}
+            {selectedRestaurant.lat && selectedRestaurant.lng && (
+              <div className="relative mx-5 mt-3 rounded-xl overflow-hidden border border-gray-100" style={{ height: '160px' }}>
+                <div ref={miniMapRef} className="w-full h-full" />
+                {/* 주소 오버레이 */}
+                {selectedRestaurant.vicinity && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-3 py-2">
+                    <p className="text-xs text-white font-semibold truncate">📍 {selectedRestaurant.vicinity}</p>
+                  </div>
+                )}
+                {/* 도보 거리 뱃지 */}
+                {selectedRestaurant.distance && (
+                  <div className="absolute top-2 right-2 bg-white/90 rounded-full px-2 py-1 text-xs font-bold text-gray-700 shadow-sm">
+                    🚶 {selectedRestaurant.distance}m · {Math.ceil(selectedRestaurant.distance / 67)}분
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* 탭 */}
             <div className="flex px-5 pt-3 gap-2">

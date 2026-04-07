@@ -999,6 +999,26 @@ setBirthdayMap(bMap);
               >✕</button>
             </div>
 
+            {/* 미니맵 */}
+            <div className="relative mx-5 mt-3 rounded-xl overflow-hidden border border-gray-100" style={{ height: '150px' }}>
+              <iframe
+                title="지도"
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                loading="lazy"
+                src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY}&q=place_id:${modalRestaurant.place_id}&language=ko`}
+              />
+              <a
+                href={`https://www.google.com/maps/place/?q=place_id:${modalRestaurant.place_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute top-2 right-2 bg-white/90 rounded-full px-2 py-1 text-xs font-bold text-gray-700 shadow-sm hover:bg-white transition-all"
+              >
+                지도 열기 ↗
+              </a>
+            </div>
+
             <div className="flex px-5 pt-3 gap-2">
               <button
                 onClick={() => setModalReviewTab('google')}
