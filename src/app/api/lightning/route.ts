@@ -9,12 +9,12 @@ const supabase = createClient(
 // 번개 생성
 export async function POST(req: Request) {
   try {
-    const { creatorId, title, date, time, invitedUserIds } = await req.json();
+    const { creatorId, title, topic, date, time, invitedUserIds } = await req.json();
 
     // 1. 번개 이벤트 생성
     const { data: event, error } = await supabase
       .from('lightning_events')
-      .insert([{ creator_id: creatorId, title: title || '번개', date, time }])
+      .insert([{ creator_id: creatorId, title: title || '번개', topic: topic || null, date, time }])
       .select('id')
       .single();
 
