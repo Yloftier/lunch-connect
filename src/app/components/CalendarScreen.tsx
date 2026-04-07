@@ -28,7 +28,8 @@ interface Review {
   id: string;
   author_id: string;
   content: string;
-  restaurant: string;
+  place_id?: string;
+  place_name?: string;
   created_at: string;
   author?: any;
 }
@@ -59,7 +60,16 @@ export default function CalendarScreen({ user }: Props) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
-  const [newReview, setNewReview] = useState({ content: '', restaurant: '' });
+  const [newReview, setNewReview] = useState({ content: '', restaurant: '', place_id: '', place_name: '', rating: 5 });
+const [restaurantSearch, setRestaurantSearch] = useState('');
+const [restaurantResults, setRestaurantResults] = useState<any[]>([]);
+const [isSearchingRestaurant, setIsSearchingRestaurant] = useState(false);
+const [showRestaurantModal, setShowRestaurantModal] = useState(false);
+const [modalRestaurant, setModalRestaurant] = useState<{ place_id: string; place_name: string } | null>(null);
+const [modalGoogleReviews, setModalGoogleReviews] = useState<any[]>([]);
+const [modalLangdyReviews, setModalLangdyReviews] = useState<any[]>([]);
+const [modalReviewTab, setModalReviewTab] = useState<'google' | 'langdy'>('google');
+const [isLoadingModalReviews, setIsLoadingModalReviews] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [monthStats, setMonthStats] = useState({ total: 0, myTurn: 0 });
@@ -97,16 +107,16 @@ export default function CalendarScreen({ user }: Props) {
     
     if (groupIds.length > 0) {
       const { data: reviewData } = await supabase
-        .from('matching_reviews')
-        .select('matching_group_id, restaurant')
-        .in('matching_group_id', groupIds);
-      setRestaurantMap(
-        Object.fromEntries(
-          (reviewData || [])
-            .filter(r => r.restaurant)
-            .map(r => [r.matching_group_id, r.restaurant])
-        )
-      );
+      .from('matching_reviews')
+      .select('matching_group_id, place_name')
+      .in('matching_group_id', groupIds);
+    setRestaurantMap(
+      Object.fromEntries(
+        (reviewData || [])
+          .filter(r => r.place_name)
+          .map(r => [r.matching_group_id, r.place_name])
+      )
+    );
     }
     
     
@@ -189,10 +199,20 @@ setBirthdayMap(bMap);
       setMatchingGroup(groupData);
 
       const { data: reviewData } = await supabase
-        .from('matching_reviews')
-        .select('*, author:author_id(id, name)')
-        .eq('matching_group_id', event.matching_group_id);
-      setReviews(reviewData || []);
+      .from('matching_reviews')
+      .select('*')
+      .eq('matching_group_id', event.matching_group_id);
+    
+    const authorIds = [...new Set((reviewData || []).map((r: any) => r.author_id))];
+    let authorMap: Record<string, any> = {};
+    if (authorIds.length > 0) {
+      const { data: authorData } = await supabase
+        .from('users')
+        .select('id, name')
+        .in('id', authorIds);
+      (authorData || []).forEach((u: any) => { authorMap[u.id] = u; });
+    }
+    setReviews((reviewData || []).map((r: any) => ({ ...r, author: authorMap[r.author_id] || null })));
 
       const { data: commentData } = await supabase
         .from('comments')
@@ -225,19 +245,87 @@ setBirthdayMap(bMap);
   const handleAddReview = async () => {
     if (!newReview.content.trim() || !selectedEvent) return;
     const { data, error } = await supabase
-      .from('matching_reviews')
+    .from('matching_reviews')
+    .insert([{
+      matching_group_id: selectedEvent.matching_group_id,
+      author_id: user.id,
+      content: newReview.content.trim(),
+      place_id: newReview.place_id || null,
+      place_name: newReview.place_name || null,
+      rating: newReview.rating,
+    }])
+    .select('*')
+    .single();
+
+  // restaurant_reviews에도 동시 저장 (place_id 있을 때만)
+  if (!error && newReview.place_id) {
+    await supabase
+      .from('restaurant_reviews')
       .insert([{
-        matching_group_id: selectedEvent.matching_group_id,
-        author_id: user.id,
-        content: newReview.content.trim(),
-        restaurant: newReview.restaurant.trim()
-      }])
-      .select('*, author:author_id(id, name)')
-      .single();
-    if (!error && data) {
-      setReviews(prev => [...prev, data]);
-      setNewReview({ content: '', restaurant: '' });
-      setShowReviewForm(false);
+        place_id: newReview.place_id,
+        place_name: newReview.place_name,
+        user_id: user.id,
+        rating: newReview.rating,
+        comment: newReview.content.trim(),
+      }]);
+  }
+      if (!error && data) {
+        // 유저 정보 별도 조회
+        const { data: authorData } = await supabase
+          .from('users')
+          .select('id, name')
+          .eq('id', user.id)
+          .single();
+        setReviews(prev => [...prev, { ...data, author: authorData }]);
+        setNewReview({ content: '', restaurant: '', place_id: '', place_name: '', rating: 5 });
+        setRestaurantSearch('');
+        setRestaurantResults([]);
+        setShowReviewForm(false);
+      }
+  };
+  
+  const searchRestaurant = async (keyword: string) => {
+    if (!keyword.trim()) { setRestaurantResults([]); return; }
+    setIsSearchingRestaurant(true);
+    try {
+      const res = await fetch(`/api/places?lat=37.4793&lng=126.9647&query=${encodeURIComponent(keyword)}`);
+      const data = await res.json();
+      setRestaurantResults(data.results?.slice(0, 5) || []);
+    } catch {
+      setRestaurantResults([]);
+    } finally {
+      setIsSearchingRestaurant(false);
+    }
+  };
+  
+  const handleOpenRestaurantModal = async (placeId: string, placeName: string) => {
+    setModalRestaurant({ place_id: placeId, place_name: placeName });
+    setShowRestaurantModal(true);
+    setModalReviewTab('google');
+    setIsLoadingModalReviews(true);
+    try {
+      const [googleRes, langdyRes] = await Promise.all([
+        fetch(`/api/places/reviews?placeId=${encodeURIComponent(placeId)}`),
+        supabase.from('restaurant_reviews').select('*, user:user_id(id, name)').eq('place_id', placeId)
+      ]);
+      const googleData = await googleRes.json();
+      setModalGoogleReviews(googleData.reviews || []);
+  
+      const langdyData = langdyRes.data || [];
+      const userIds = [...new Set(langdyData.map((r: any) => r.user_id))];
+      if (userIds.length > 0) {
+        const { data: userData } = await supabase.from('users').select('id, name').in('id', userIds);
+        const userMap: Record<string, any> = {};
+        (userData || []).forEach((u: any) => { userMap[u.id] = u; });
+        setModalLangdyReviews(langdyData.map((r: any) => ({ ...r, user: userMap[r.user_id] || null })));
+      } else {
+        setModalLangdyReviews([]);
+      }
+    } catch {
+      setModalGoogleReviews([]);
+      setModalLangdyReviews([]);
+    } finally {
+      setIsLoadingModalReviews(false);
     }
   };
 
@@ -437,14 +525,62 @@ setBirthdayMap(bMap);
     </div>
   )}
 
-  {showReviewForm && matchingGroup?.members?.some((m: any) => m.id === user.id) && (
+{showReviewForm && matchingGroup?.members?.some((m: any) => m.id === user.id) && (
     <div className="bg-orange-50 rounded-xl p-3 mb-3 space-y-2">
-      <input
-        className="w-full p-2 border rounded-lg text-xs text-black outline-none focus:ring-2 focus:ring-orange-400"
-        placeholder="식당 이름"
-        value={newReview.restaurant}
-        onChange={(e) => setNewReview({...newReview, restaurant: e.target.value})}
-      />
+      <div className="relative">
+        <input
+          className="w-full p-2 border rounded-lg text-xs text-black outline-none focus:ring-2 focus:ring-orange-400"
+          placeholder="식당 이름 검색"
+    value={restaurantSearch}
+    onChange={(e) => {
+      setRestaurantSearch(e.target.value);
+      searchRestaurant(e.target.value);
+    }}
+  />
+  {/* 선택된 식당 표시 */}
+  {newReview.place_name && (
+    <div className="flex items-center gap-1 mt-1">
+      <span className="text-xs text-orange-500 font-bold">📍 {newReview.place_name}</span>
+      <button
+        onClick={() => setNewReview({...newReview, place_id: '', place_name: ''})}
+        className="text-xs text-gray-300 hover:text-red-400"
+      >✕</button>
+    </div>
+  )}
+  {/* 검색 결과 드롭다운 */}
+  {restaurantResults.length > 0 && !newReview.place_name && (
+    <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-40 overflow-y-auto">
+      {isSearchingRestaurant ? (
+        <div className="p-2 text-xs text-center text-gray-400">검색 중...</div>
+      ) : (
+        restaurantResults.map((r: any) => (
+          <button
+            key={r.place_id}
+            onClick={() => {
+              setNewReview({...newReview, place_id: r.place_id, place_name: r.name});
+              setRestaurantSearch(r.name);
+              setRestaurantResults([]);
+            }}
+            className="w-full text-left px-3 py-2 hover:bg-orange-50 transition-all"
+          >
+            <p className="text-xs font-bold text-gray-800">{r.name}</p>
+            <p className="text-xs text-gray-400 truncate">{r.vicinity}</p>
+          </button>
+        ))
+      )}
+    </div>
+  )}
+</div>
+ {/* 별점 */}
+ <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map(star => (
+          <button
+            key={star}
+            onClick={() => setNewReview({...newReview, rating: star})}
+            className={`text-xl ${star <= newReview.rating ? 'text-yellow-400' : 'text-gray-200'}`}
+          >★</button>
+        ))}
+      </div>
       <textarea
         className="w-full p-2 border rounded-lg text-xs text-black outline-none focus:ring-2 focus:ring-orange-400 resize-none"
         placeholder="오늘 점심 어땠나요?"
@@ -461,9 +597,14 @@ setBirthdayMap(bMap);
     <div key={review.id} className="bg-gray-50 rounded-xl p-3 mb-2">
       <div className="flex items-center gap-2 mb-1">
         <span className="text-xs font-bold text-gray-700">{review.author?.name}</span>
-        {review.restaurant && (
-          <span className="text-xs text-orange-500">📍 {review.restaurant}</span>
-        )}
+        {review.place_name && (
+  <button
+  onClick={() => handleOpenRestaurantModal(review.place_id!, review.place_name!)}
+    className="text-xs text-orange-500 hover:text-orange-600 hover:underline"
+  >
+    📍 {review.place_name}
+  </button>
+)}
       </div>
       <p className="text-xs text-gray-600">{review.content}</p>
     </div>
@@ -517,6 +658,97 @@ setBirthdayMap(bMap);
           </div>
         )}
       </div>
+{/* 식당 리뷰 모달 */}
+{showRestaurantModal && modalRestaurant && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => setShowRestaurantModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
+              <div>
+                <h2 className="font-black text-gray-900 text-base">{modalRestaurant.place_name}</h2>
+                <p className="text-xs text-gray-400 mt-0.5">리뷰를 확인해보세요</p>
+              </div>
+              <button
+                onClick={() => setShowRestaurantModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 text-sm font-bold"
+              >✕</button>
+            </div>
+
+            <div className="flex px-5 pt-3 gap-2">
+              <button
+                onClick={() => setModalReviewTab('google')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all
+                  ${modalReviewTab === 'google' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-500'}`}
+              >🌐 구글 리뷰</button>
+              <button
+                onClick={() => setModalReviewTab('langdy')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all
+                  ${modalReviewTab === 'langdy' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-orange-50 hover:text-orange-500'}`}
+              >🍊 랭디 리뷰</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+              {isLoadingModalReviews ? (
+                <div className="flex items-center justify-center py-10">
+                  <div className="text-3xl animate-spin">🍊</div>
+                </div>
+              ) : modalReviewTab === 'google' ? (
+                modalGoogleReviews.length > 0 ? modalGoogleReviews.map((review: any, idx: number) => (
+                  <div key={idx} className="bg-gray-50 rounded-xl p-3">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      {review.authorAttribution?.photoUri ? (
+                        <img src={review.authorAttribution.photoUri} className="w-7 h-7 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center text-blue-500 font-bold text-xs">
+                          {review.authorAttribution?.displayName?.[0] || 'G'}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-gray-700 truncate">{review.authorAttribution?.displayName || '익명'}</p>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-yellow-400">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</span>
+                          {review.relativePublishTimeDescription && (
+                            <span className="text-xs text-gray-400">{review.relativePublishTimeDescription}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {review.text?.text && <p className="text-xs text-gray-600 leading-relaxed">{review.text.text}</p>}
+                  </div>
+                )) : (
+                  <div className="text-center py-10">
+                    <p className="text-3xl mb-2">🌐</p>
+                    <p className="text-xs text-gray-400">구글 리뷰가 없어요!</p>
+                  </div>
+                )
+              ) : (
+                modalLangdyReviews.length > 0 ? modalLangdyReviews.map((review: any) => (
+                  <div key={review.id} className="bg-gray-50 rounded-xl p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center text-orange-500 font-bold text-xs">
+                        {review.user?.name?.[0]}
+                      </div>
+                      <span className="text-xs font-bold text-gray-700">{review.user?.name}</span>
+                      <span className="text-xs text-yellow-400 ml-auto">{'★'.repeat(review.rating)}</span>
+                    </div>
+                    <p className="text-xs text-gray-600">{review.comment}</p>
+                  </div>
+                )) : (
+                  <div className="text-center py-10">
+                    <p className="text-3xl mb-2">🍊</p>
+                    <p className="text-xs text-gray-400">아직 팀원 리뷰가 없어요!</p>
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

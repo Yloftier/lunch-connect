@@ -91,7 +91,7 @@ const sorted = (userData || []).sort((a, b) => {
   // 생년월일 포맷 (19900522 → 1990.05.22)
   const formatBirth = (birth: string) => {
     if (!birth || birth.length !== 8) return '-';
-    return `${birth.slice(0, 4)}.${birth.slice(4, 6)}.${birth.slice(6, 8)}`;
+    return `${birth.slice(4, 6)}월 ${birth.slice(6, 8)}일`;
   };
 
   // 이번달 생일인지 확인
