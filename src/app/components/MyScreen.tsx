@@ -3,6 +3,22 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
+interface MatchingNotification {
+  id: string;
+  user_id: string;
+  group_id: string;
+  type: 'approval_request' | 'matching_complete';
+  status: string;
+  created_at: string;
+  group?: {
+    id: string;
+    date: string;
+    members: any[];
+    matcher_id: string;
+    approval_status: string;
+  };
+}
+
 interface Props {
   user: any;
   onLogout: () => void;
@@ -32,6 +48,8 @@ interface PendingMember {
 export default function MyScreen({ user, onLogout, onPendingChange }: Props) {
   const [myClubs, setMyClubs] = useState<ClubMembership[]>([]);
   const [pendingMembers, setPendingMembers] = useState<PendingMember[]>([]);
+  const [matchingNotifications, setMatchingNotifications] = useState<MatchingNotification[]>([]);
+  const [lightningPending, setLightningPending] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchMyData = async () => {
@@ -57,6 +75,16 @@ export default function MyScreen({ user, onLogout, onPendingChange }: Props) {
       setPendingMembers((pendingData || []) as any);
     }
 
+    // 매칭 알림 조회
+    const notiRes = await fetch(`/api/matching/approve?userId=${user.id}`);
+    const notiData = await notiRes.json();
+    setMatchingNotifications(notiData.notifications || []);
+
+    // 번개 초대 알림 조회
+    const lightningRes = await fetch(`/api/lightning?userId=${user.id}`);
+    const lightningData = await lightningRes.json();
+    setLightningPending(lightningData.pending || []);
+
     setIsLoading(false);
   };
 
@@ -81,6 +109,56 @@ export default function MyScreen({ user, onLogout, onPendingChange }: Props) {
     fetchMyData();
     onPendingChange();
   };
+
+  // 매칭 승인
+  const handleMatchingApprove = async (groupId: string) => {
+    await fetch('/api/matching/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, groupId, action: 'approve' }),
+    });
+    fetchMyData();
+    onPendingChange();
+  };
+
+  // 매칭 거절
+  const handleMatchingReject = async (groupId: string) => {
+    await fetch('/api/matching/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, groupId, action: 'reject' }),
+    });
+    fetchMyData();
+    onPendingChange();
+  };
+
+  // 매칭 완료 알림 읽음 처리
+  const handleReadComplete = async (notificationId: string) => {
+    await supabase
+      .from('matching_notifications')
+      .update({ status: 'read' })
+      .eq('id', notificationId);
+    fetchMyData();
+    onPendingChange();
+  };
+
+  // 번개 승인/거절
+  const handleLightningApprove = async (eventId: string, action: 'approve' | 'reject') => {
+    await fetch('/api/lightning/respond', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, eventId, action }),
+    });
+    fetchMyData();
+    onPendingChange();
+  };
+
+  const pendingMatchingNoti = matchingNotifications.filter(
+    n => n.type === 'approval_request' && n.status === 'pending'
+  );
+  const completeMatchingNoti = matchingNotifications.filter(
+    n => n.type === 'matching_complete' && n.status === 'unread'
+  );
 
   return (
     <div className="max-w-2xl pt-4 space-y-4">
@@ -140,6 +218,128 @@ export default function MyScreen({ user, onLogout, onPendingChange }: Props) {
           <p className="text-gray-300 text-sm text-center py-4">가입한 동아리가 없어요</p>
         )}
       </div>
+
+      {/* 번개 초대 알림 */}
+      {lightningPending.length > 0 && (
+        <div className="bg-white rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <p className="font-bold text-gray-800">⚡ 번개 초대</p>
+            <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">{lightningPending.length}</span>
+          </div>
+          <div className="space-y-3">
+            {lightningPending.map(ev => {
+              const creator = ev.participants?.find((p: any) => p.user_id === ev.creator_id);
+              const approvedCount = ev.participants?.filter((p: any) => p.status === 'approved').length || 0;
+              return (
+                <div key={ev.id} className="p-4 bg-yellow-50 rounded-xl border border-yellow-100">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-bold text-gray-800">{ev.title}</p>
+                    {ev.time && <span className="text-xs text-gray-400">🕐 {ev.time}</span>}
+                  </div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    📅 {ev.date} · {creator?.user?.name}님이 초대했어요
+                  </p>
+                  <p className="text-xs text-gray-400 mb-3">
+                    현재 {approvedCount}명 참가 확정
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleLightningApprove(ev.id, 'approve')}
+                      className="flex-1 text-sm bg-yellow-400 text-white py-2 rounded-xl font-bold hover:bg-yellow-500">
+                      참가 ⚡
+                    </button>
+                    <button
+                      onClick={() => handleLightningApprove(ev.id, 'reject')}
+                      className="flex-1 text-sm bg-gray-100 text-gray-500 py-2 rounded-xl">
+                      패스
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 매칭 승인 요청 알림 */}
+      {pendingMatchingNoti.length > 0 && (
+        <div className="bg-white rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <p className="font-bold text-gray-800">매칭 승인 요청</p>
+            <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">{pendingMatchingNoti.length}</span>
+          </div>
+          <div className="space-y-3">
+            {pendingMatchingNoti.map(noti => {
+              const members: any[] = noti.group?.members || [];
+              const matcher = members.find((m: any) => m.id === noti.group?.matcher_id);
+              return (
+                <div key={noti.id} className="p-4 bg-orange-50 rounded-xl border border-orange-100">
+                  <p className="text-sm font-semibold text-gray-800 mb-1">
+                    🎲 {matcher?.name}님이 점심 매칭을 요청했어요!
+                  </p>
+                  <p className="text-xs text-gray-500 mb-3">{noti.group?.date} · {members.length}명 그룹</p>
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {members.map((m: any) => (
+                      <span key={m.id} className="text-xs bg-white text-gray-600 px-2 py-1 rounded-full border border-gray-200">
+                        {m.name} {m.gender === '남' ? '👨' : '👩'}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleMatchingApprove(noti.group_id)}
+                      className="flex-1 text-sm bg-orange-500 text-white py-2 rounded-xl font-bold"
+                    >
+                      승인 ✅
+                    </button>
+                    <button
+                      onClick={() => handleMatchingReject(noti.group_id)}
+                      className="flex-1 text-sm bg-gray-100 text-gray-500 py-2 rounded-xl"
+                    >
+                      거절
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 매칭 완료 알림 */}
+      {completeMatchingNoti.length > 0 && (
+        <div className="bg-white rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <p className="font-bold text-gray-800">매칭 완료 🎉</p>
+            <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">{completeMatchingNoti.length}</span>
+          </div>
+          <div className="space-y-3">
+            {completeMatchingNoti.map(noti => {
+              const members: any[] = noti.group?.members || [];
+              return (
+                <div key={noti.id} className="p-4 bg-green-50 rounded-xl border border-green-100">
+                  <p className="text-sm font-semibold text-gray-800 mb-1">
+                    🎉 {noti.group?.date} 점심 매칭이 확정됐어요!
+                  </p>
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {members.map((m: any) => (
+                      <span key={m.id} className="text-xs bg-white text-gray-600 px-2 py-1 rounded-full border border-green-200">
+                        {m.name} {m.gender === '남' ? '👨' : '👩'}
+                      </span>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => handleReadComplete(noti.id)}
+                    className="w-full text-xs text-green-600 py-1.5 rounded-xl border border-green-200 bg-white"
+                  >
+                    확인
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 가입 승인 요청 (회장인 경우만) */}
       {pendingMembers.length > 0 && (

@@ -18,6 +18,7 @@ interface Props {
 
 export default function MainScreen({ user }: Props) {
   const [clubBadge, setClubBadge] = useState(0);
+  const [myBadge, setMyBadge] = useState(0);
 
   const fetchClubBadge = async () => {
     let count = 0;
@@ -69,8 +70,28 @@ export default function MainScreen({ user }: Props) {
     setClubBadge(count);
   };
 
+  const fetchMyBadge = async () => {
+    const [matchingRes, lightningRes] = await Promise.all([
+      fetch(`/api/matching/approve?userId=${user.id}`),
+      fetch(`/api/lightning?userId=${user.id}`),
+    ]);
+    const matchingData = await matchingRes.json();
+    const lightningData = await lightningRes.json();
+
+    const matchingCount = (matchingData.notifications || []).filter(
+      (n: any) =>
+        (n.type === 'approval_request' && n.status === 'pending') ||
+        (n.type === 'matching_complete' && n.status === 'unread')
+    ).length;
+
+    const lightningCount = (lightningData.pending || []).length;
+
+    setMyBadge(matchingCount + lightningCount);
+  };
+
   useEffect(() => {
     fetchClubBadge();
+    fetchMyBadge();
   }, []);
 
   const [activeTab, setActiveTab] = useState<Tab>(() => {
@@ -104,7 +125,7 @@ export default function MainScreen({ user }: Props) {
               { tab: 'calendar', icon: '📅', label: '캘린더', badge: 0 },
               { tab: 'club', icon: '🏃', label: '동아리', badge: clubBadge },
               { tab: 'restaurant', icon: '🍜', label: '주변 음식점', badge: 0 },
-              { tab: 'my', icon: '👤', label: 'My', badge: 0 },
+              { tab: 'my', icon: '👤', label: 'My', badge: myBadge },
             ].map(({ tab, icon, label, badge }) => (
               <button
                 key={tab}
@@ -181,7 +202,7 @@ export default function MainScreen({ user }: Props) {
                 localStorage.removeItem('lunch_tab');
                 window.location.reload();
               }}
-              onPendingChange={() => fetchClubBadge()}
+              onPendingChange={() => { fetchClubBadge(); fetchMyBadge(); }}
             />
           )}
         </div>

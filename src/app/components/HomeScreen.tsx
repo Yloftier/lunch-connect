@@ -30,6 +30,7 @@ const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
 export default function HomeScreen({ user }: Props) {
   const [weekSchedules, setWeekSchedules] = useState<DaySchedule[]>([]);
   const [birthdayUsers, setBirthdayUsers] = useState<any[]>([]);
+  const [lightningUpcoming, setLightningUpcoming] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchWeekData = async () => {
@@ -143,6 +144,14 @@ const birthdays = (allUsers || []).filter(u =>
 
 setBirthdayUsers(birthdays);
 setWeekSchedules(result);
+
+// 번개 일정 (내가 승인한 것 중 이번 주 이내)
+const lightningRes = await fetch(`/api/lightning?userId=${user.id}`);
+const lightningData = await lightningRes.json();
+setLightningUpcoming(
+  (lightningData.upcoming || []).filter((ev: any) => ev.date >= startDate && ev.date <= endDate)
+);
+
 setIsLoading(false);
   };
 
@@ -217,7 +226,8 @@ setIsLoading(false);
       <div className="space-y-3">
         {weekSchedules.map((day) => {
           const { month, dayOfWeek, day: dayNum, isToday } = formatDate(day.date);
-          const hasEvent = day.matchingTurn || day.clubEvents.length > 0;
+          const dayLightning = lightningUpcoming.filter(ev => ev.date === day.dateStr);
+          const hasEvent = day.matchingTurn || day.clubEvents.length > 0 || dayLightning.length > 0;
 
           return (
             <div key={day.dateStr}
@@ -282,6 +292,26 @@ setIsLoading(false);
                       </div>
                     </div>
                   )}
+
+                  {/* 번개 일정 */}
+                  {dayLightning.map((ev: any) => {
+                    const approvedCount = ev.participants?.filter((p: any) => p.status === 'approved').length || 0;
+                    return (
+                      <div key={ev.id} className="flex items-start gap-3 p-3 rounded-xl bg-yellow-50">
+                        <span className="text-lg">⚡</span>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-bold text-gray-800">{ev.title}</p>
+                            <span className="text-xs text-yellow-500 font-semibold">번개</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {ev.time && <span className="text-xs text-gray-400">🕐 {ev.time}</span>}
+                            <span className="text-xs text-gray-400">👥 {approvedCount}명 참가</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
 
                   {/* 동아리 일정 */}
                   {day.clubEvents.map(event => (

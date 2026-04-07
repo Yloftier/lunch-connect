@@ -80,8 +80,8 @@ export async function POST(req: Request) {
 
     const matchingGroup = [matcher, ...selectedMembers];
 
-    // 5. 매칭 결과 저장
-    await supabase
+    // 5. 매칭 결과 저장 (id 반환받기)
+    const { data: groupData } = await supabase
       .from('matching_groups')
       .insert([{
         date: today,
@@ -92,10 +92,37 @@ export async function POST(req: Request) {
           team: u.team,
           role: u.role,
           gender: u.gender
-        }))
-      }]);
+        })),
+        approval_status: 'pending'
+      }])
+      .select('id')
+      .single();
 
-    // 6. 매칭자 status 완료로 업데이트
+    // 6. calendar_events에 매칭 이벤트 등록
+    if (groupData?.id) {
+      await supabase
+        .from('calendar_events')
+        .insert([{
+          date: today,
+          type: 'matching',
+          title: `점심 매칭`,
+          matching_group_id: groupData.id,
+        }]);
+    }
+
+    // 7. 매칭자 제외 멤버에게 승인 요청 알림 생성
+    if (groupData?.id) {
+      const nonMatcherMembers = selectedMembers; // 매칭자 본인 제외
+      const notifications = nonMatcherMembers.map((u: any) => ({
+        user_id: u.id,
+        group_id: groupData.id,
+        type: 'approval_request',
+        status: 'pending',
+      }));
+      await supabase.from('matching_notifications').insert(notifications);
+    }
+
+    // 7. 매칭자 status 완료로 업데이트
     await supabase
       .from('matching_turns')
       .update({ status: '완료' })
@@ -150,6 +177,7 @@ export async function GET() {
           matcher: matcherInfo?.data ?? null,
           status: turnData?.status ?? null,
           group: groupData?.members ?? null,
+          groupApprovalStatus: groupData?.approval_status ?? null,
           matcherId: turnData?.matcher_id ?? null,
         },
       tomorrow: {

@@ -76,6 +76,18 @@ const [isLoadingModalReviews, setIsLoadingModalReviews] = useState(false);
   const [restaurantMap, setRestaurantMap] = useState<Record<string, string>>({});
   const [birthdayMap, setBirthdayMap] = useState<Record<string, string[]>>({});
 
+  // 번개 관련 상태
+  const [lightningEvents, setLightningEvents] = useState<any[]>([]);
+  const [showLightningModal, setShowLightningModal] = useState(false);
+  const [lightningTitle, setLightningTitle] = useState('번개');
+  const [lightningDate, setLightningDate] = useState('');
+  const [lightningTime, setLightningTime] = useState('');
+  const [lightningUserSearch, setLightningUserSearch] = useState('');
+  const [lightningUserResults, setLightningUserResults] = useState<any[]>([]);
+  const [lightningSelectedUsers, setLightningSelectedUsers] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [isCreatingLightning, setIsCreatingLightning] = useState(false);
+
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const firstDay = new Date(year, month, 1).getDay();
@@ -175,6 +187,49 @@ const bMap: Record<string, string[]> = {};
 setBirthdayMap(bMap);
 
   setMonthStats({ total: completed, myTurn: myGroupCount });
+
+  // 번개 이벤트 fetch
+  const { data: lightningRes } = await supabase
+    .from('lightning_events')
+    .select('*')
+    .gte('date', startDate)
+    .lte('date', endDate);
+
+  // 번개 참가자 fetch
+  const lightningIds = (lightningRes || []).map((e: any) => e.id);
+  let lightningWithParticipants: any[] = [];
+  if (lightningIds.length > 0) {
+    const { data: lpData } = await supabase
+      .from('lightning_participants')
+      .select('*')
+      .in('event_id', lightningIds);
+
+    const lpUserIds = [...new Set((lpData || []).map((p: any) => p.user_id))];
+    const { data: lpUsers } = await supabase
+      .from('users')
+      .select('id, name, team')
+      .in('id', lpUserIds.length > 0 ? lpUserIds : ['none']);
+
+    const lpUserMap: Record<string, any> = {};
+    (lpUsers || []).forEach((u: any) => { lpUserMap[u.id] = u; });
+
+    lightningWithParticipants = (lightningRes || []).map((ev: any) => ({
+      ...ev,
+      participants: (lpData || [])
+        .filter((p: any) => p.event_id === ev.id)
+        .map((p: any) => ({ ...p, user: lpUserMap[p.user_id] || null })),
+    }));
+  } else {
+    lightningWithParticipants = lightningRes || [];
+  }
+  setLightningEvents(lightningWithParticipants);
+
+  // 전체 유저 (번개 초대용)
+  const { data: usersData } = await supabase
+    .from('users')
+    .select('id, name, team, gender')
+    .neq('id', user.id);
+  setAllUsers(usersData || []);
   };
 
   const fetchDateDetail = async (dateStr: string) => {
@@ -329,6 +384,63 @@ setBirthdayMap(bMap);
     }
   };
 
+  // 번개 유저 검색
+  const handleLightningUserSearch = (query: string) => {
+    setLightningUserSearch(query);
+    if (!query.trim()) { setLightningUserResults([]); return; }
+    const filtered = allUsers.filter(u =>
+      u.name.includes(query) &&
+      !lightningSelectedUsers.find(s => s.id === u.id)
+    );
+    setLightningUserResults(filtered.slice(0, 5));
+  };
+
+  const handleSelectLightningUser = (u: any) => {
+    setLightningSelectedUsers(prev => [...prev, u]);
+    setLightningUserSearch('');
+    setLightningUserResults([]);
+  };
+
+  const handleRemoveLightningUser = (id: string) => {
+    setLightningSelectedUsers(prev => prev.filter(u => u.id !== id));
+  };
+
+  // 번개 생성
+  const handleCreateLightning = async () => {
+    if (!lightningDate || lightningSelectedUsers.length === 0) {
+      alert('날짜와 초대할 인원을 선택해주세요.');
+      return;
+    }
+    setIsCreatingLightning(true);
+    try {
+      const res = await fetch('/api/lightning', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          creatorId: user.id,
+          title: lightningTitle || '번개',
+          date: lightningDate,
+          time: lightningTime,
+          invitedUserIds: lightningSelectedUsers.map(u => u.id),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error); return; }
+
+      // 모달 닫고 초기화
+      setShowLightningModal(false);
+      setLightningTitle('번개');
+      setLightningDate('');
+      setLightningTime('');
+      setLightningSelectedUsers([]);
+      await fetchEvents();
+    } catch {
+      alert('번개 생성 중 오류가 발생했어요.');
+    } finally {
+      setIsCreatingLightning(false);
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr + 'T00:00:00');
     return `${d.getMonth() + 1}월 ${d.getDate()}일 (${DAYS[d.getDay()]})`;
@@ -422,6 +534,11 @@ setBirthdayMap(bMap);
     ${isSelected ? 'text-white' : 'text-yellow-500'}`}>
     🎂 {birthdayMap[dateStr].join(', ')}
   </span>
+)}
+
+{/* 번개 도트 */}
+{lightningEvents.some(ev => ev.date === dateStr) && (
+  <span className="text-xs">⚡</span>
 )}
 
 {/* 식당 이름 */}
@@ -657,7 +774,153 @@ setBirthdayMap(bMap);
             <p className="text-gray-400 text-sm mt-2">이날은 일정이 없어요</p>
           </div>
         )}
+
+        {/* 번개 목록 */}
+        {selectedDate && lightningEvents.filter(ev => ev.date === selectedDate).length > 0 && (
+          <div className="mt-4 border-t border-gray-100 pt-4">
+            <p className="text-xs text-gray-400 mb-2">⚡ 번개</p>
+            <div className="space-y-2">
+              {lightningEvents.filter(ev => ev.date === selectedDate).map(ev => (
+                <div key={ev.id} className="p-3 bg-yellow-50 rounded-xl border border-yellow-100">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-bold text-gray-800">{ev.title}</p>
+                    {ev.time && <span className="text-xs text-gray-400">🕐 {ev.time}</span>}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {ev.participants?.map((p: any) => (
+                      <span key={p.id}
+                        className={`text-xs px-2 py-0.5 rounded-full border
+                          ${p.status === 'approved' ? 'bg-green-50 text-green-600 border-green-200' :
+                            p.status === 'rejected' ? 'bg-red-50 text-red-400 border-red-200' :
+                            'bg-gray-50 text-gray-400 border-gray-200'}`}>
+                        {p.user?.name} {p.status === 'approved' ? '✅' : p.status === 'rejected' ? '❌' : '⏳'}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 번개 추가 버튼 */}
+        {selectedDate && (
+          <button
+            onClick={() => {
+              setLightningDate(selectedDate);
+              setShowLightningModal(true);
+            }}
+            className="w-full mt-4 py-2.5 border-2 border-dashed border-yellow-300 text-yellow-500 rounded-xl text-sm font-bold hover:bg-yellow-50 transition-all"
+          >
+            ⚡ 번개 추가
+          </button>
+        )}
       </div>
+
+      {/* 번개 생성 모달 */}
+      {showLightningModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => setShowLightningModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4"
+            onClick={e => e.stopPropagation()}>
+            {/* 헤더 */}
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
+              <h2 className="font-black text-gray-900 text-base">⚡ 번개 만들기</h2>
+              <button onClick={() => setShowLightningModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 text-sm font-bold">✕</button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* 제목 */}
+              <div>
+                <label className="text-xs text-gray-500 font-semibold mb-1 block">제목</label>
+                <input
+                  className="w-full p-3 border border-gray-200 rounded-xl text-sm text-black outline-none focus:ring-2 focus:ring-yellow-400"
+                  placeholder="번개, 급 술약속, 카페 등"
+                  value={lightningTitle}
+                  onChange={e => setLightningTitle(e.target.value)}
+                />
+              </div>
+
+              {/* 날짜 + 시간 */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 font-semibold mb-1 block">날짜</label>
+                  <input type="date"
+                    className="w-full p-3 border border-gray-200 rounded-xl text-sm text-black outline-none focus:ring-2 focus:ring-yellow-400"
+                    value={lightningDate}
+                    onChange={e => setLightningDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 font-semibold mb-1 block">시간 (선택)</label>
+                  <input type="time"
+                    className="w-full p-3 border border-gray-200 rounded-xl text-sm text-black outline-none focus:ring-2 focus:ring-yellow-400"
+                    value={lightningTime}
+                    onChange={e => setLightningTime(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* 인원 검색 */}
+              <div>
+                <label className="text-xs text-gray-500 font-semibold mb-1 block">초대할 인원</label>
+                <div className="relative">
+                  <input
+                    className="w-full p-3 border border-gray-200 rounded-xl text-sm text-black outline-none focus:ring-2 focus:ring-yellow-400"
+                    placeholder="이름으로 검색..."
+                    value={lightningUserSearch}
+                    onChange={e => handleLightningUserSearch(e.target.value)}
+                  />
+                  {lightningUserResults.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg z-10 mt-1">
+                      {lightningUserResults.map(u => (
+                        <button key={u.id}
+                          onClick={() => handleSelectLightningUser(u)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-yellow-50 text-left">
+                          <div className="w-7 h-7 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-600 font-bold text-xs">
+                            {u.name[0]}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-800">{u.name}</p>
+                            <p className="text-xs text-gray-400">{u.team}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {/* 선택된 인원 */}
+                {lightningSelectedUsers.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {lightningSelectedUsers.map(u => (
+                      <span key={u.id}
+                        className="flex items-center gap-1.5 bg-yellow-100 text-yellow-700 text-xs px-3 py-1 rounded-full font-semibold">
+                        {u.name}
+                        <button onClick={() => handleRemoveLightningUser(u.id)} className="text-yellow-500 hover:text-red-400">✕</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 하단 버튼 */}
+            <div className="flex gap-3 px-5 pb-5">
+              <button onClick={() => setShowLightningModal(false)}
+                className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl text-sm font-bold">
+                닫기
+              </button>
+              <button
+                onClick={handleCreateLightning}
+                disabled={isCreatingLightning}
+                className="flex-1 py-3 bg-yellow-400 text-white rounded-xl text-sm font-black shadow-sm hover:bg-yellow-500 transition-all disabled:opacity-50">
+                {isCreatingLightning ? '생성 중...' : '⚡ 생성'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 {/* 식당 리뷰 모달 */}
 {showRestaurantModal && modalRestaurant && (
         <div

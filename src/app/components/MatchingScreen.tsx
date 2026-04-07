@@ -19,6 +19,7 @@ export default function MatchingScreen({ user }: Props) {
   const [tomorrowMatcher, setTomorrowMatcher] = useState<User | null>(null);
   const [matchingGroup, setMatchingGroup] = useState<User[] | null>(null);
   const [todayStatus, setTodayStatus] = useState<string | null>(null);
+  const [groupApprovalStatus, setGroupApprovalStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMatching, setIsMatching] = useState(false);
   const [groupSize, setGroupSize] = useState<2 | 3>(2);
@@ -36,6 +37,7 @@ export default function MatchingScreen({ user }: Props) {
       setTodayMatcher(data.today.matcher);
       setTodayStatus(data.today.status);
       setMatchingGroup(data.today.group);
+      setGroupApprovalStatus(data.today.groupApprovalStatus);
       setTomorrowMatcher(data.tomorrow.matcher);
     } catch (err) {
       console.error('현황 조회 실패:', err);
@@ -83,6 +85,7 @@ export default function MatchingScreen({ user }: Props) {
                 setPhase('done');
                 setMatchingGroup(group);
                 setTodayStatus('완료');
+                setGroupApprovalStatus('pending');
                 setIsMatching(false);
               }, 800);
             }
@@ -186,10 +189,28 @@ export default function MatchingScreen({ user }: Props) {
         </div>
       )}
 
-      {/* 매칭 완료 결과 */}
-      {phase === 'done' && matchingGroup && (
+      {/* 매칭 결과 (phase done 또는 이미 그룹 있을 때) */}
+      {(phase === 'done' || (phase === 'idle' && matchingGroup)) && matchingGroup && (
         <div className="bg-white rounded-2xl p-5 shadow-sm mb-4">
-          <p className="text-xs text-gray-400 mb-3">오늘의 매칭그룹 🎉</p>
+          {/* 승인 대기 중 */}
+          {(phase === 'done' || groupApprovalStatus === 'pending') && groupApprovalStatus !== 'confirmed' && (
+            <div className="mb-4 p-3 bg-yellow-50 rounded-xl border border-yellow-100">
+              <p className="text-xs font-bold text-yellow-700 mb-1">⏳ 승인 대기 중</p>
+              <p className="text-xs text-yellow-600">
+                {matchingGroup
+                  .filter(m => m.id !== todayMatcher?.id)
+                  .map(m => `${m.name}님`)
+                  .join(', ')}의 응답을 기다리고 있어요
+              </p>
+            </div>
+          )}
+          {/* 매칭 확정 */}
+          {groupApprovalStatus === 'confirmed' && (
+            <div className="mb-4 p-3 bg-green-50 rounded-xl border border-green-100">
+              <p className="text-xs font-bold text-green-700">🎉 매칭 확정!</p>
+            </div>
+          )}
+          <p className="text-xs text-gray-400 mb-3">오늘의 매칭그룹</p>
           <div className="space-y-3">
             {matchingGroup.map((member) => (
               <div key={member.id} className="flex items-center gap-3">
