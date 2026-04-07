@@ -361,9 +361,10 @@ export default function RestaurantScreen({ user }: Props) {
                           if (placeReviews.length === 0) return null;
                           const avg = (placeReviews.reduce((s, r) => s + r.rating, 0) / placeReviews.length).toFixed(1);
                           return (
-                            <span className="text-xs bg-orange-100 text-orange-500 px-1.5 py-0.5 rounded-full font-bold">
-                              🍊 {avg} ({placeReviews.length})
-                            </span>
+<span className="text-xs bg-orange-100 text-orange-500 px-1.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+  <img src="/langdyconnect.png" className="w-3 h-3 inline-block" />
+  {avg} ({placeReviews.length})
+</span>
                           );
                         })()}
                       </div>

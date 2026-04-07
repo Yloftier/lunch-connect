@@ -110,8 +110,8 @@ export default function LoginScreen({ onExistingUser, onNewUser }: Props) {
 
         {/* 로고 & 타이틀 */}
         <div className="text-center mb-8">
-          <span className="text-5xl">🍊</span>
-          <h1 className="text-2xl font-bold mt-3 text-gray-800">랭디 커넥트</h1>
+        <img src="/langdyconnect.png" alt="랭디 커넥트" className="w-20 h-20 mx-auto" />
+        <h1 className="text-2xl font-bold mt-3 text-gray-800">랭디 커넥트</h1>
           <p className="text-gray-500 text-sm mt-1">
             {view === 'login' ? '로그인하고 시작해요!' : '회원가입하고 시작해요!'}
           </p>
