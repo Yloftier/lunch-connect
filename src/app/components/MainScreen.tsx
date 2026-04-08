@@ -9,8 +9,9 @@ import { supabase } from '../lib/supabase';
 import MyScreen from './MyScreen';
 import PeopleScreen from './PeopleScreen';
 import RestaurantScreen from './RestaurantScreen';
+import LangdyGuideScreen from './LangdyGuideScreen';
 
-type Tab = 'home' | 'people' | 'matching' | 'calendar' | 'club' | 'restaurant' | 'my';
+type Tab = 'home' | 'langdy' | 'people' | 'matching' | 'calendar' | 'club' | 'restaurant' | 'my';
 
 interface Props {
   user: any;
@@ -120,6 +121,7 @@ export default function MainScreen({ user }: Props) {
           <nav className="space-y-1">
             {[
               { tab: 'home', icon: '🏠', label: '홈', badge: 0 },
+              { tab: 'langdy', icon: '🧡', label: '너랑 랭디랑', badge: 0 },
               { tab: 'people', icon: '👥', label: '피플', badge: 0 },
               { tab: 'matching', icon: '🎲', label: '매칭', badge: 0 },
               { tab: 'calendar', icon: '📅', label: '캘린더', badge: 0 },
@@ -189,6 +191,7 @@ export default function MainScreen({ user }: Props) {
         {/* 탭 콘텐츠 */}
         <div className="px-5 md:px-10">
           {activeTab === 'home' && <HomeScreen user={user} />}
+          {activeTab === 'langdy' && <LangdyGuideScreen />}
           {activeTab === 'people' && <PeopleScreen user={user} />}
           {activeTab === 'matching' && <MatchingScreen user={user} />}
           {activeTab === 'calendar' && <CalendarScreen user={user} />}
