@@ -129,10 +129,6 @@ export default function LoginScreen({ onExistingUser, onNewUser }: Props) {
                 maxLength={5}
                 value={loginData.name}
                 onChange={(e) => setLoginData({...loginData, name: e.target.value})}
-                onBlur={(e) => {
-                  const val = e.target.value.replace(/[^가-힣\s]/g, '').slice(0, 5);
-                  setLoginData({...loginData, name: val});
-                }}
               />
             </div>
             <div>
@@ -177,10 +173,6 @@ export default function LoginScreen({ onExistingUser, onNewUser }: Props) {
                 maxLength={5}
                 value={registerData.name}
                 onChange={(e) => setRegisterData({...registerData, name: e.target.value})}
-                onBlur={(e) => {
-                  const val = e.target.value.replace(/[^가-힣\s]/g, '').slice(0, 5);
-                  setRegisterData({...registerData, name: val});
-                }}
               />
             </div>
             <div>
