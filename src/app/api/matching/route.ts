@@ -144,15 +144,19 @@ export async function GET() {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
-    // 1라운드: 독립 쿼리 3개 병렬
+    // 1라운드: 독립 쿼리 3개 병렬 (.limit(1) — 중복 데이터도 안전)
     const [todayTurnRes, todayGroupRes, tomorrowTurnRes] = await Promise.all([
-      supabase.from('matching_turns').select('status, matcher_id').eq('date', today).single(),
-      supabase.from('matching_groups').select('members, approval_status').eq('date', today).single(),
-      supabase.from('matching_turns').select('matcher_id').eq('date', tomorrowStr).single(),
+      supabase.from('matching_turns').select('status, matcher_id').eq('date', today).limit(1),
+      supabase.from('matching_groups').select('members, approval_status').eq('date', today).limit(1),
+      supabase.from('matching_turns').select('matcher_id').eq('date', tomorrowStr).limit(1),
     ]);
 
-    const matcherId = todayTurnRes.data?.matcher_id ?? null;
-    const tomorrowMatcherId = tomorrowTurnRes.data?.matcher_id ?? null;
+    const todayTurn = todayTurnRes.data?.[0] ?? null;
+    const todayGroup = todayGroupRes.data?.[0] ?? null;
+    const tomorrowTurn = tomorrowTurnRes.data?.[0] ?? null;
+
+    const matcherId = todayTurn?.matcher_id ?? null;
+    const tomorrowMatcherId = tomorrowTurn?.matcher_id ?? null;
 
     // 2라운드: 매칭자 유저 정보 2개 병렬
     const [todayMatcherRes, tomorrowMatcherRes] = await Promise.all([
@@ -167,9 +171,9 @@ export async function GET() {
     return NextResponse.json({
       today: {
         matcher: todayMatcherRes.data ?? null,
-        status: todayTurnRes.data?.status ?? null,
-        group: todayGroupRes.data?.members ?? null,
-        groupApprovalStatus: todayGroupRes.data?.approval_status ?? null,
+        status: todayTurn?.status ?? null,
+        group: todayGroup?.members ?? null,
+        groupApprovalStatus: todayGroup?.approval_status ?? null,
         matcherId,
       },
       tomorrow: {

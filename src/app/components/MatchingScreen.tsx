@@ -54,27 +54,31 @@ export default function MatchingScreen({ user }: Props) {
       tomorrow.setDate(tomorrow.getDate() + 1);
       const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
-      // 1라운드: 독립 쿼리 3개 병렬
+      // 1라운드: 독립 쿼리 3개 병렬 (.single() 대신 .limit(1) — 중복 데이터도 안전)
       const [todayTurnRes, todayGroupRes, tomorrowTurnRes] = await Promise.all([
         supabase
           .from('matching_turns')
           .select('status, matcher_id')
           .eq('date', today)
-          .single(),
+          .limit(1),
         supabase
           .from('matching_groups')
           .select('members, approval_status')
           .eq('date', today)
-          .single(),
+          .limit(1),
         supabase
           .from('matching_turns')
           .select('matcher_id')
           .eq('date', tomorrowStr)
-          .single(),
+          .limit(1),
       ]);
 
-      const matcherId = todayTurnRes.data?.matcher_id ?? null;
-      const tomorrowMatcherId = tomorrowTurnRes.data?.matcher_id ?? null;
+      const todayTurn = todayTurnRes.data?.[0] ?? null;
+      const todayGroup = todayGroupRes.data?.[0] ?? null;
+      const tomorrowTurn = tomorrowTurnRes.data?.[0] ?? null;
+
+      const matcherId = todayTurn?.matcher_id ?? null;
+      const tomorrowMatcherId = tomorrowTurn?.matcher_id ?? null;
 
       // 2라운드: 매칭자 유저 정보 2개 병렬
       const [todayMatcherRes, tomorrowMatcherRes] = await Promise.all([
@@ -87,9 +91,9 @@ export default function MatchingScreen({ user }: Props) {
       ]);
 
       const matcher = todayMatcherRes.data ?? null;
-      const group = todayGroupRes.data?.members ?? null;
-      const status = todayTurnRes.data?.status ?? null;
-      const approvalStatus = todayGroupRes.data?.approval_status ?? null;
+      const group = todayGroup?.members ?? null;
+      const status = todayTurn?.status ?? null;
+      const approvalStatus = todayGroup?.approval_status ?? null;
       const tomorrowMatcher = tomorrowMatcherRes.data ?? null;
 
       // 캐시 업데이트
