@@ -78,41 +78,45 @@ export default function HomeScreen({ user }: Props) {
       .gte('date', startDate)
       .lte('date', endDate);
 
-    // 내가 속한 동아리
+    // 내가 속한 동아리 ID (참석여부 표시용)
     const { data: myClubs } = await supabase
       .from('club_members')
-      .select('club_id, club:club_id(id, name, emoji)')
+      .select('club_id')
       .eq('user_id', user.id)
       .eq('status', '승인');
-
     const myClubIds = (myClubs || []).map((m: any) => m.club_id);
 
-    // 동아리 일정
-    let clubEvents: any[] = [];
-    if (myClubIds.length > 0) {
-      const { data: eventData } = await supabase
-        .from('club_events')
-        .select('*, club:club_id(id, name, emoji)')
-        .in('club_id', myClubIds)
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .order('date', { ascending: true });
+    // 동아리 일정 전체 (가입 여부 무관)
+    const { data: allClubEvents } = await supabase
+      .from('club_events')
+      .select('id, club_id, title, date, time, location, description, created_by')
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .order('date', { ascending: true });
 
-      clubEvents = eventData || [];
+    // 동아리 정보
+    const clubIds = [...new Set((allClubEvents || []).map(e => e.club_id))];
+    const { data: clubsData } = await supabase
+      .from('clubs')
+      .select('id, name, emoji')
+      .in('id', clubIds.length > 0 ? clubIds : ['none']);
+    const clubMap: Record<string, any> = {};
+    (clubsData || []).forEach(c => { clubMap[c.id] = c; });
 
-      // 내 참석 여부
-      const eventIds = clubEvents.map(e => e.id);
-      const { data: attendances } = await supabase
-        .from('club_event_attendances')
-        .select('event_id, status')
-        .in('event_id', eventIds.length > 0 ? eventIds : ['none'])
-        .eq('user_id', user.id);
+    // 내 참석 여부
+    const eventIds = (allClubEvents || []).map(e => e.id);
+    const { data: attendances } = await supabase
+      .from('club_event_attendances')
+      .select('event_id, status')
+      .in('event_id', eventIds.length > 0 ? eventIds : ['none'])
+      .eq('user_id', user.id);
 
-      clubEvents = clubEvents.map(e => ({
-        ...e,
-        myAttendance: attendances?.find(a => a.event_id === e.id)?.status || null
-      }));
-    }
+    let clubEvents: any[] = (allClubEvents || []).map(e => ({
+      ...e,
+      club: clubMap[e.club_id] || null,
+      isMember: myClubIds.includes(e.club_id),
+      myAttendance: attendances?.find(a => a.event_id === e.id)?.status || null
+    }));
 
     // 날짜별로 조합
     const result = days.map(day => {
@@ -145,11 +149,26 @@ const birthdays = (allUsers || []).filter(u =>
 setBirthdayUsers(birthdays);
 setWeekSchedules(result);
 
-// 번개 일정 (내가 승인한 것 중 이번 주 이내)
-const lightningRes = await fetch(`/api/lightning?userId=${user.id}`);
-const lightningData = await lightningRes.json();
+// 번개 일정 전체 (참여 여부 무관, 이번 주 이내)
+const { data: allLightning } = await supabase
+  .from('lightning_events')
+  .select('id, creator_id, title, topic, date, time')
+  .gte('date', startDate)
+  .lte('date', endDate)
+  .order('date', { ascending: true });
+
+const lightningEventIds = (allLightning || []).map(e => e.id);
+const { data: lpData } = await supabase
+  .from('lightning_participants')
+  .select('event_id, user_id, status')
+  .in('event_id', lightningEventIds.length > 0 ? lightningEventIds : ['none']);
+
 setLightningUpcoming(
-  (lightningData.upcoming || []).filter((ev: any) => ev.date >= startDate && ev.date <= endDate)
+  (allLightning || []).map(ev => ({
+    ...ev,
+    participants: (lpData || []).filter(p => p.event_id === ev.id),
+    myStatus: (lpData || []).find(p => p.event_id === ev.id && p.user_id === user.id)?.status || null,
+  }))
 );
 
 setIsLoading(false);
@@ -303,6 +322,12 @@ setIsLoading(false);
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-bold text-gray-800">{ev.title}</p>
                             <span className="text-xs text-yellow-500 font-semibold">번개</span>
+                            {ev.myStatus === 'approved' && (
+                              <span className="text-xs bg-yellow-200 text-yellow-700 px-1.5 py-0.5 rounded-full">참가중</span>
+                            )}
+                            {ev.myStatus === 'pending' && (
+                              <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">초대받음</span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 mt-0.5">
                             {ev.time && <span className="text-xs text-gray-400">🕐 {ev.time}</span>}
@@ -314,7 +339,7 @@ setIsLoading(false);
                   })}
 
                   {/* 동아리 일정 */}
-                  {day.clubEvents.map(event => (
+                  {day.clubEvents.map((event: any) => (
                     <div key={event.id} className="flex items-start gap-3 p-3 rounded-xl bg-blue-50">
                       <span className="text-lg">{event.club?.emoji || '🏃'}</span>
                       <div className="flex-1">
@@ -326,19 +351,24 @@ setIsLoading(false);
                           {event.time && <span className="text-xs text-gray-400">🕐 {event.time}</span>}
                           {event.location && <span className="text-xs text-gray-400">📍 {event.location}</span>}
                         </div>
-                        {/* 참석 여부 */}
-                        <div className="mt-1">
-                          {event.myAttendance ? (
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold
-                              ${event.myAttendance === '참석' ? 'bg-blue-100 text-blue-500' : 'bg-gray-100 text-gray-400'}`}>
-                              {event.myAttendance === '참석' ? '✅ 참석' : '❌ 불참'}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-orange-400 bg-orange-50 px-2 py-0.5 rounded-full">
-                              ⚠️ 참석 여부 미선택
-                            </span>
-                          )}
-                        </div>
+                        {/* 참석 여부 — 가입 멤버만 표시 */}
+                        {event.isMember && (
+                          <div className="mt-1">
+                            {event.myAttendance ? (
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold
+                                ${event.myAttendance === '참석' ? 'bg-blue-100 text-blue-500' : 'bg-gray-100 text-gray-400'}`}>
+                                {event.myAttendance === '참석' ? '✅ 참석' : '❌ 불참'}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-orange-400 bg-orange-50 px-2 py-0.5 rounded-full">
+                                ⚠️ 참석 여부 미선택
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {!event.isMember && (
+                          <span className="text-xs text-gray-300 mt-1 block">미가입 동아리</span>
+                        )}
                       </div>
                     </div>
                   ))}
