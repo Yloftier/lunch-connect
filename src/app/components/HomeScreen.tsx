@@ -56,112 +56,114 @@ export default function HomeScreen({ user }: Props) {
 
     const startDate = days[0].dateStr;
     const endDate = days[6].dateStr;
+    const thisMonth = String(new Date().getMonth() + 1).padStart(2, '0');
 
-    // 매칭 턴 불러오기
-    const { data: turnData } = await supabase
-      .from('matching_turns')
-      .select('date, status, matcher_id')
-      .gte('date', startDate)
-      .lte('date', endDate);
+    // ── 1라운드: 서로 독립적인 쿼리 6개 동시 실행 ──
+    const [
+      { data: turnData },
+      { data: groupData },
+      { data: myClubs },
+      { data: allClubEvents },
+      { data: allUsers },
+      { data: allLightning },
+    ] = await Promise.all([
+      // 매칭 턴 (matcher 조인으로 별도 유저 쿼리 제거)
+      supabase
+        .from('matching_turns')
+        .select('date, status, matcher_id, matcher:matcher_id(id, name, team)')
+        .gte('date', startDate)
+        .lte('date', endDate),
+      // 매칭 그룹
+      supabase
+        .from('matching_groups')
+        .select('date, members, matcher_id')
+        .gte('date', startDate)
+        .lte('date', endDate),
+      // 내 동아리 멤버십
+      supabase
+        .from('club_members')
+        .select('club_id')
+        .eq('user_id', user.id)
+        .eq('status', '승인'),
+      // 동아리 일정 전체
+      supabase
+        .from('club_events')
+        .select('id, club_id, title, date, time, location, description, created_by')
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true }),
+      // 생일자
+      supabase.from('users').select('id, name, birth, team'),
+      // 번개 전체
+      supabase
+        .from('lightning_events')
+        .select('id, creator_id, title, topic, date, time')
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true }),
+    ]);
 
-    // 매칭자 정보
-    const matcherIds = [...new Set((turnData || []).map(t => t.matcher_id))];
-    const { data: matcherUsers } = await supabase
-      .from('users')
-      .select('id, name, team')
-      .in('id', matcherIds.length > 0 ? matcherIds : ['none']);
-
-    // 매칭 그룹
-    const { data: groupData } = await supabase
-      .from('matching_groups')
-      .select('date, members, matcher_id')
-      .gte('date', startDate)
-      .lte('date', endDate);
-
-    // 내가 속한 동아리 ID (참석여부 표시용)
-    const { data: myClubs } = await supabase
-      .from('club_members')
-      .select('club_id')
-      .eq('user_id', user.id)
-      .eq('status', '승인');
     const myClubIds = (myClubs || []).map((m: any) => m.club_id);
+    const clubIds = [...new Set((allClubEvents || []).map((e: any) => e.club_id))];
+    const eventIds = (allClubEvents || []).map((e: any) => e.id);
+    const lightningEventIds = (allLightning || []).map((e: any) => e.id);
 
-    // 동아리 일정 전체 (가입 여부 무관)
-    const { data: allClubEvents } = await supabase
-      .from('club_events')
-      .select('id, club_id, title, date, time, location, description, created_by')
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .order('date', { ascending: true });
+    // ── 2라운드: 1라운드 결과에 의존하는 쿼리 3개 동시 실행 ──
+    const [
+      { data: clubsData },
+      { data: attendances },
+      { data: lpData },
+    ] = await Promise.all([
+      supabase
+        .from('clubs')
+        .select('id, name, emoji')
+        .in('id', clubIds.length > 0 ? clubIds : ['none']),
+      supabase
+        .from('club_event_attendances')
+        .select('event_id, status')
+        .in('event_id', eventIds.length > 0 ? eventIds : ['none'])
+        .eq('user_id', user.id),
+      supabase
+        .from('lightning_participants')
+        .select('event_id, user_id, status')
+        .in('event_id', lightningEventIds.length > 0 ? lightningEventIds : ['none']),
+    ]);
 
-    // 동아리 정보
-    const clubIds = [...new Set((allClubEvents || []).map(e => e.club_id))];
-    const { data: clubsData } = await supabase
-      .from('clubs')
-      .select('id, name, emoji')
-      .in('id', clubIds.length > 0 ? clubIds : ['none']);
+    // 동아리 맵 구성
     const clubMap: Record<string, any> = {};
-    (clubsData || []).forEach(c => { clubMap[c.id] = c; });
+    (clubsData || []).forEach((c: any) => { clubMap[c.id] = c; });
 
-    // 내 참석 여부
-    const eventIds = (allClubEvents || []).map(e => e.id);
-    const { data: attendances } = await supabase
-      .from('club_event_attendances')
-      .select('event_id, status')
-      .in('event_id', eventIds.length > 0 ? eventIds : ['none'])
-      .eq('user_id', user.id);
-
-    let clubEvents: any[] = (allClubEvents || []).map(e => ({
+    const clubEvents: any[] = (allClubEvents || []).map((e: any) => ({
       ...e,
       club: clubMap[e.club_id] || null,
       isMember: myClubIds.includes(e.club_id),
-      myAttendance: attendances?.find(a => a.event_id === e.id)?.status || null
+      myAttendance: attendances?.find((a: any) => a.event_id === e.id)?.status || null,
     }));
 
     // 날짜별로 조합
     const result = days.map(day => {
-      const turn = turnData?.find(t => t.date === day.dateStr);
-      const matcher = matcherUsers?.find(u => u.id === turn?.matcher_id);
-      const group = groupData?.find(g => g.date === day.dateStr);
+      const turn = (turnData || []).find((t: any) => t.date === day.dateStr);
+      const group = (groupData || []).find((g: any) => g.date === day.dateStr);
       const dayClubEvents = clubEvents.filter(e => e.date === day.dateStr);
 
       return {
         ...day,
         matchingTurn: turn ? {
-          matcher,
+          matcher: (turn as any).matcher ?? null,
           status: turn.status,
-          group: group?.members || null
+          group: group?.members || null,
         } : undefined,
-        clubEvents: dayClubEvents
+        clubEvents: dayClubEvents,
       };
     });
 
-// 이달의 생일자
-const thisMonth = String(new Date().getMonth() + 1).padStart(2, '0');
-const { data: allUsers } = await supabase
-  .from('users')
-  .select('id, name, birth, team');
+    // 생일자
+    const birthdays = (allUsers || []).filter((u: any) =>
+      u.birth && u.birth.length === 8 && u.birth.slice(4, 6) === thisMonth
+    ).sort((a: any, b: any) => a.birth.slice(6, 8).localeCompare(b.birth.slice(6, 8)));
 
-const birthdays = (allUsers || []).filter(u => 
-  u.birth && u.birth.length === 8 && u.birth.slice(4, 6) === thisMonth
-).sort((a, b) => a.birth.slice(6, 8).localeCompare(b.birth.slice(6, 8)));
-
-setBirthdayUsers(birthdays);
-setWeekSchedules(result);
-
-// 번개 일정 전체 (참여 여부 무관, 이번 주 이내)
-const { data: allLightning } = await supabase
-  .from('lightning_events')
-  .select('id, creator_id, title, topic, date, time')
-  .gte('date', startDate)
-  .lte('date', endDate)
-  .order('date', { ascending: true });
-
-const lightningEventIds = (allLightning || []).map(e => e.id);
-const { data: lpData } = await supabase
-  .from('lightning_participants')
-  .select('event_id, user_id, status')
-  .in('event_id', lightningEventIds.length > 0 ? lightningEventIds : ['none']);
+    setBirthdayUsers(birthdays);
+    setWeekSchedules(result);
 
 setLightningUpcoming(
   (allLightning || []).map(ev => ({

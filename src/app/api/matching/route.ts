@@ -140,49 +140,40 @@ export async function POST(req: Request) {
 export async function GET() {
   try {
     const today = new Date().toISOString().split('T')[0];
-
-    // 오늘 매칭자
-    const { data: turnData } = await supabase
-    .from('matching_turns')
-    .select('*')
-    .eq('date', today)
-    .single();
-  
-  const matcherInfo = turnData ? await supabase
-    .from('users')
-    .select('id, name, team, gender')
-    .eq('id', turnData.matcher_id)
-    .single() : null;
-
-    // 오늘 매칭 결과
-    const { data: groupData } = await supabase
-      .from('matching_groups')
-      .select('*')
-      .eq('date', today)
-      .single();
-
-    // 내일 매칭자 (매칭 횟수 가장 적은 사람)
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
-    const { data: tomorrowTurn } = await supabase
-      .from('matching_turns')
-      .select('*, matcher:matcher_id(id, name, team)')
-      .eq('date', tomorrowStr)
-      .single();
+    // 3개 쿼리 동시 실행 (matcher 정보는 조인으로 한 번에)
+    const [todayTurnRes, todayGroupRes, tomorrowTurnRes] = await Promise.all([
+      supabase
+        .from('matching_turns')
+        .select('status, matcher_id, matcher:matcher_id(id, name, team, gender)')
+        .eq('date', today)
+        .single(),
+      supabase
+        .from('matching_groups')
+        .select('members, approval_status')
+        .eq('date', today)
+        .single(),
+      supabase
+        .from('matching_turns')
+        .select('matcher:matcher_id(id, name, team)')
+        .eq('date', tomorrowStr)
+        .single(),
+    ]);
 
-      return NextResponse.json({
-        today: {
-          matcher: matcherInfo?.data ?? null,
-          status: turnData?.status ?? null,
-          group: groupData?.members ?? null,
-          groupApprovalStatus: groupData?.approval_status ?? null,
-          matcherId: turnData?.matcher_id ?? null,
-        },
+    return NextResponse.json({
+      today: {
+        matcher: (todayTurnRes.data?.matcher as any) ?? null,
+        status: todayTurnRes.data?.status ?? null,
+        group: todayGroupRes.data?.members ?? null,
+        groupApprovalStatus: todayGroupRes.data?.approval_status ?? null,
+        matcherId: todayTurnRes.data?.matcher_id ?? null,
+      },
       tomorrow: {
-        matcher: tomorrowTurn?.matcher ?? null,
-      }
+        matcher: (tomorrowTurnRes.data?.matcher as any) ?? null,
+      },
     });
 
   } catch (error) {
