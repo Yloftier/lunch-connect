@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
 interface User {
   id: string;
@@ -14,13 +15,26 @@ interface Props {
   user: any;
 }
 
+// 탭 전환 시 재로딩 방지용 모듈 레벨 캐시
+let _cache: {
+  todayMatcher: User | null;
+  tomorrowMatcher: User | null;
+  matchingGroup: User[] | null;
+  todayStatus: string | null;
+  groupApprovalStatus: string | null;
+  matcherId: string | null;
+  cachedAt: number;
+} | null = null;
+const CACHE_TTL = 30_000; // 30초
+
 export default function MatchingScreen({ user }: Props) {
-  const [todayMatcher, setTodayMatcher] = useState<User | null>(null);
-  const [tomorrowMatcher, setTomorrowMatcher] = useState<User | null>(null);
-  const [matchingGroup, setMatchingGroup] = useState<User[] | null>(null);
-  const [todayStatus, setTodayStatus] = useState<string | null>(null);
-  const [groupApprovalStatus, setGroupApprovalStatus] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [todayMatcher, setTodayMatcher] = useState<User | null>(_cache?.todayMatcher ?? null);
+  const [tomorrowMatcher, setTomorrowMatcher] = useState<User | null>(_cache?.tomorrowMatcher ?? null);
+  const [matchingGroup, setMatchingGroup] = useState<User[] | null>(_cache?.matchingGroup ?? null);
+  const [todayStatus, setTodayStatus] = useState<string | null>(_cache?.todayStatus ?? null);
+  const [groupApprovalStatus, setGroupApprovalStatus] = useState<string | null>(_cache?.groupApprovalStatus ?? null);
+  // 캐시가 있으면 로딩 스피너 없이 바로 표시
+  const [isLoading, setIsLoading] = useState(_cache === null);
   const [isMatching, setIsMatching] = useState(false);
   const [groupSize, setGroupSize] = useState<2 | 3>(2);
   const [revealedMembers, setRevealedMembers] = useState<User[]>([]);
@@ -29,16 +43,59 @@ export default function MatchingScreen({ user }: Props) {
   const isMyTurn = todayMatcher?.id === user.id;
   const canMatch = isMyTurn && todayStatus === '대기중';
 
-  const fetchTodayStatus = async () => {
+  const fetchTodayStatus = async (force = false) => {
+    // 캐시 유효하면 스킵
+    if (!force && _cache && Date.now() - _cache.cachedAt < CACHE_TTL) return;
+
     setIsLoading(true);
     try {
-      const res = await fetch('/api/matching');
-      const data = await res.json();
-      setTodayMatcher(data.today.matcher);
-      setTodayStatus(data.today.status);
-      setMatchingGroup(data.today.group);
-      setGroupApprovalStatus(data.today.groupApprovalStatus);
-      setTomorrowMatcher(data.tomorrow.matcher);
+      const today = new Date().toISOString().split('T')[0];
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+      // API 라우트 없이 Supabase 직접 호출 (3개 병렬)
+      const [todayTurnRes, todayGroupRes, tomorrowTurnRes] = await Promise.all([
+        supabase
+          .from('matching_turns')
+          .select('status, matcher_id, matcher:matcher_id(id, name, team, gender)')
+          .eq('date', today)
+          .single(),
+        supabase
+          .from('matching_groups')
+          .select('members, approval_status')
+          .eq('date', today)
+          .single(),
+        supabase
+          .from('matching_turns')
+          .select('matcher:matcher_id(id, name, team)')
+          .eq('date', tomorrowStr)
+          .single(),
+      ]);
+
+      const matcher = (todayTurnRes.data?.matcher as any) ?? null;
+      const group = todayGroupRes.data?.members ?? null;
+      const status = todayTurnRes.data?.status ?? null;
+      const approvalStatus = todayGroupRes.data?.approval_status ?? null;
+      const tomorrowMatcher = (tomorrowTurnRes.data?.matcher as any) ?? null;
+      const matcherId = todayTurnRes.data?.matcher_id ?? null;
+
+      // 캐시 업데이트
+      _cache = {
+        todayMatcher: matcher,
+        tomorrowMatcher,
+        matchingGroup: group,
+        todayStatus: status,
+        groupApprovalStatus: approvalStatus,
+        matcherId,
+        cachedAt: Date.now(),
+      };
+
+      setTodayMatcher(matcher);
+      setTodayStatus(status);
+      setMatchingGroup(group);
+      setGroupApprovalStatus(approvalStatus);
+      setTomorrowMatcher(tomorrowMatcher);
     } catch (err) {
       console.error('현황 조회 실패:', err);
     } finally {
@@ -87,6 +144,7 @@ export default function MatchingScreen({ user }: Props) {
                 setTodayStatus('완료');
                 setGroupApprovalStatus('pending');
                 setIsMatching(false);
+                _cache = null; // 매칭 완료 후 캐시 무효화
               }, 800);
             }
           }, index * 1500); // 1.5초 간격으로 한 명씩
