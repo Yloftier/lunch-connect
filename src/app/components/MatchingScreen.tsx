@@ -54,11 +54,11 @@ export default function MatchingScreen({ user }: Props) {
       tomorrow.setDate(tomorrow.getDate() + 1);
       const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
-      // API 라우트 없이 Supabase 직접 호출 (3개 병렬)
+      // 1라운드: 독립 쿼리 3개 병렬
       const [todayTurnRes, todayGroupRes, tomorrowTurnRes] = await Promise.all([
         supabase
           .from('matching_turns')
-          .select('status, matcher_id, matcher:matcher_id(id, name, team, gender)')
+          .select('status, matcher_id')
           .eq('date', today)
           .single(),
         supabase
@@ -68,17 +68,29 @@ export default function MatchingScreen({ user }: Props) {
           .single(),
         supabase
           .from('matching_turns')
-          .select('matcher:matcher_id(id, name, team)')
+          .select('matcher_id')
           .eq('date', tomorrowStr)
           .single(),
       ]);
 
-      const matcher = (todayTurnRes.data?.matcher as any) ?? null;
+      const matcherId = todayTurnRes.data?.matcher_id ?? null;
+      const tomorrowMatcherId = tomorrowTurnRes.data?.matcher_id ?? null;
+
+      // 2라운드: 매칭자 유저 정보 2개 병렬
+      const [todayMatcherRes, tomorrowMatcherRes] = await Promise.all([
+        matcherId
+          ? supabase.from('users').select('id, name, team, role, gender').eq('id', matcherId).single()
+          : Promise.resolve({ data: null }),
+        tomorrowMatcherId
+          ? supabase.from('users').select('id, name, team, role, gender').eq('id', tomorrowMatcherId).single()
+          : Promise.resolve({ data: null }),
+      ]);
+
+      const matcher = todayMatcherRes.data ?? null;
       const group = todayGroupRes.data?.members ?? null;
       const status = todayTurnRes.data?.status ?? null;
       const approvalStatus = todayGroupRes.data?.approval_status ?? null;
-      const tomorrowMatcher = (tomorrowTurnRes.data?.matcher as any) ?? null;
-      const matcherId = todayTurnRes.data?.matcher_id ?? null;
+      const tomorrowMatcher = tomorrowMatcherRes.data ?? null;
 
       // 캐시 업데이트
       _cache = {

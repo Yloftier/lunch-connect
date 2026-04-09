@@ -144,35 +144,36 @@ export async function GET() {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
-    // 3개 쿼리 동시 실행 (matcher 정보는 조인으로 한 번에)
+    // 1라운드: 독립 쿼리 3개 병렬
     const [todayTurnRes, todayGroupRes, tomorrowTurnRes] = await Promise.all([
-      supabase
-        .from('matching_turns')
-        .select('status, matcher_id, matcher:matcher_id(id, name, team, gender)')
-        .eq('date', today)
-        .single(),
-      supabase
-        .from('matching_groups')
-        .select('members, approval_status')
-        .eq('date', today)
-        .single(),
-      supabase
-        .from('matching_turns')
-        .select('matcher:matcher_id(id, name, team)')
-        .eq('date', tomorrowStr)
-        .single(),
+      supabase.from('matching_turns').select('status, matcher_id').eq('date', today).single(),
+      supabase.from('matching_groups').select('members, approval_status').eq('date', today).single(),
+      supabase.from('matching_turns').select('matcher_id').eq('date', tomorrowStr).single(),
+    ]);
+
+    const matcherId = todayTurnRes.data?.matcher_id ?? null;
+    const tomorrowMatcherId = tomorrowTurnRes.data?.matcher_id ?? null;
+
+    // 2라운드: 매칭자 유저 정보 2개 병렬
+    const [todayMatcherRes, tomorrowMatcherRes] = await Promise.all([
+      matcherId
+        ? supabase.from('users').select('id, name, team, gender').eq('id', matcherId).single()
+        : Promise.resolve({ data: null }),
+      tomorrowMatcherId
+        ? supabase.from('users').select('id, name, team').eq('id', tomorrowMatcherId).single()
+        : Promise.resolve({ data: null }),
     ]);
 
     return NextResponse.json({
       today: {
-        matcher: (todayTurnRes.data?.matcher as any) ?? null,
+        matcher: todayMatcherRes.data ?? null,
         status: todayTurnRes.data?.status ?? null,
         group: todayGroupRes.data?.members ?? null,
         groupApprovalStatus: todayGroupRes.data?.approval_status ?? null,
-        matcherId: todayTurnRes.data?.matcher_id ?? null,
+        matcherId,
       },
       tomorrow: {
-        matcher: (tomorrowTurnRes.data?.matcher as any) ?? null,
+        matcher: tomorrowMatcherRes.data ?? null,
       },
     });
 

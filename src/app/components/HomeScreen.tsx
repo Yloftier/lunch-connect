@@ -67,10 +67,10 @@ export default function HomeScreen({ user }: Props) {
       { data: allUsers },
       { data: allLightning },
     ] = await Promise.all([
-      // 매칭 턴 (matcher 조인으로 별도 유저 쿼리 제거)
+      // 매칭 턴
       supabase
         .from('matching_turns')
-        .select('date, status, matcher_id, matcher:matcher_id(id, name, team)')
+        .select('date, status, matcher_id')
         .gte('date', startDate)
         .lte('date', endDate),
       // 매칭 그룹
@@ -107,12 +107,14 @@ export default function HomeScreen({ user }: Props) {
     const clubIds = [...new Set((allClubEvents || []).map((e: any) => e.club_id))];
     const eventIds = (allClubEvents || []).map((e: any) => e.id);
     const lightningEventIds = (allLightning || []).map((e: any) => e.id);
+    const matcherIds = [...new Set((turnData || []).map((t: any) => t.matcher_id))];
 
-    // ── 2라운드: 1라운드 결과에 의존하는 쿼리 3개 동시 실행 ──
+    // ── 2라운드: 1라운드 결과에 의존하는 쿼리 4개 동시 실행 ──
     const [
       { data: clubsData },
       { data: attendances },
       { data: lpData },
+      { data: matcherUsers },
     ] = await Promise.all([
       supabase
         .from('clubs')
@@ -127,6 +129,10 @@ export default function HomeScreen({ user }: Props) {
         .from('lightning_participants')
         .select('event_id, user_id, status')
         .in('event_id', lightningEventIds.length > 0 ? lightningEventIds : ['none']),
+      supabase
+        .from('users')
+        .select('id, name, team')
+        .in('id', matcherIds.length > 0 ? matcherIds : ['none']),
     ]);
 
     // 동아리 맵 구성
@@ -143,13 +149,14 @@ export default function HomeScreen({ user }: Props) {
     // 날짜별로 조합
     const result = days.map(day => {
       const turn = (turnData || []).find((t: any) => t.date === day.dateStr);
+      const matcher = (matcherUsers || []).find((u: any) => u.id === turn?.matcher_id) ?? null;
       const group = (groupData || []).find((g: any) => g.date === day.dateStr);
       const dayClubEvents = clubEvents.filter(e => e.date === day.dateStr);
 
       return {
         ...day,
         matchingTurn: turn ? {
-          matcher: (turn as any).matcher ?? null,
+          matcher,
           status: turn.status,
           group: group?.members || null,
         } : undefined,
