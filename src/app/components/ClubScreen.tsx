@@ -87,44 +87,21 @@ const [attendanceModal, setAttendanceModal] = useState<string | null>(null); // 
       .single();
     setMyMembership(myData || null);
 
-// 승인된 멤버 목록
+// 승인된 멤버 목록 (FK 조인으로 유저 정보 함께 조회)
 const { data: memberData } = await supabase
   .from('club_members')
-  .select('id, club_id, user_id, role, status, joined_at')
+  .select('id, club_id, user_id, role, status, joined_at, user:users(id, name, team, role)')
   .eq('club_id', club.id)
   .eq('status', '승인');
+setMembers((memberData || []) as any);
 
-// 멤버 유저 정보 별도로 가져오기
-const memberUserIds = (memberData || []).map(m => m.user_id);
-const { data: memberUsers } = await supabase
-  .from('users')
-  .select('id, name, team, role')
-  .in('id', memberUserIds);
-
-const membersWithUser = (memberData || []).map(m => ({
-  ...m,
-  user: memberUsers?.find(u => u.id === m.user_id) || null
-}));
-setMembers(membersWithUser as any);
-
-// 가입 신청 대기 목록 (회장용)
+// 가입 신청 대기 목록 (회장용) — FK 조인 사용
 const { data: pendingData } = await supabase
   .from('club_members')
-  .select('id, club_id, user_id, role, status')
+  .select('id, club_id, user_id, role, status, user:users(id, name, team)')
   .eq('club_id', club.id)
   .eq('status', '신청중');
-
-const pendingUserIds = (pendingData || []).map(m => m.user_id);
-const { data: pendingUsers } = await supabase
-  .from('users')
-  .select('id, name, team')
-  .in('id', pendingUserIds.length > 0 ? pendingUserIds : ['none']);
-
-const pendingWithUser = (pendingData || []).map(m => ({
-  ...m,
-  user: pendingUsers?.find(u => u.id === m.user_id) || null
-}));
-setPendingMembers(pendingWithUser as any);
+setPendingMembers((pendingData || []) as any);
 
     // 활동 일정
     const { data: eventData } = await supabase
