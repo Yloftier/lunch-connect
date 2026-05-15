@@ -27,7 +27,31 @@ let _cache: {
 } | null = null;
 const CACHE_TTL = 30_000; // 30초
 
+// 🚧 매칭 기능 일시 비활성화 플래그
+// 기능을 다시 활성화하려면 false 로 변경하세요.
+const MATCHING_DISABLED = true;
+
 export default function MatchingScreen({ user }: Props) {
+  if (MATCHING_DISABLED) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-5 py-10">
+        <img
+          src="/Langdy.png"
+          alt="준비중"
+          className="w-32 h-32 mb-6 opacity-90"
+        />
+        <p className="text-xl font-black text-gray-800 mb-2">준비중이에요.</p>
+        <p className="text-sm text-gray-400 text-center">
+          더 좋은 모습으로 곧 찾아올게요!
+        </p>
+      </div>
+    );
+  }
+
+  return <MatchingScreenImpl user={user} />;
+}
+
+function MatchingScreenImpl({ user }: Props) {
   const [todayMatcher, setTodayMatcher] = useState<User | null>(_cache?.todayMatcher ?? null);
   const [tomorrowMatcher, setTomorrowMatcher] = useState<User | null>(_cache?.tomorrowMatcher ?? null);
   const [matchingGroup, setMatchingGroup] = useState<User[] | null>(_cache?.matchingGroup ?? null);

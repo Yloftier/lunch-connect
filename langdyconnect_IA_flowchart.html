@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>랭디 커넥트 — IA & 플로우차트</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.6.1/mermaid.min.js"></script>
+<style>
+  :root {
+    --orange: #E8550A;
+    --orange-light: #FFF3EC;
+    --orange-mid: #FF8C52;
+    --dark: #1A1A1A;
+    --gray: #F5F5F5;
+    --border: #E0E0E0;
+    --text: #333333;
+    --muted: #888888;
+    --white: #FFFFFF;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', -apple-system, sans-serif;
+    background: #FAFAFA;
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  /* ── Cover ───────────────────────────────── */
+  .cover {
+    background: linear-gradient(135deg, var(--orange) 0%, #C04208 100%);
+    color: white;
+    padding: 60px 40px;
+    text-align: center;
+  }
+  .cover .emoji { font-size: 64px; display: block; margin-bottom: 16px; }
+  .cover h1 { font-size: 42px; font-weight: 800; letter-spacing: -1px; }
+  .cover .sub { font-size: 16px; opacity: .75; margin-top: 8px; letter-spacing: 2px; }
+  .cover .meta {
+    display: inline-flex; gap: 24px; margin-top: 32px;
+    background: rgba(255,255,255,.15); border-radius: 12px;
+    padding: 12px 28px; font-size: 14px;
+  }
+
+  /* ── Nav ─────────────────────────────────── */
+  .nav {
+    position: sticky; top: 0; z-index: 100;
+    background: white; border-bottom: 2px solid var(--orange);
+    display: flex; gap: 0; overflow-x: auto;
+  }
+  .nav a {
+    padding: 14px 22px; text-decoration: none;
+    color: var(--muted); font-size: 14px; font-weight: 600;
+    white-space: nowrap; transition: color .2s, border-bottom .2s;
+    border-bottom: 3px solid transparent; margin-bottom: -2px;
+  }
+  .nav a:hover, .nav a.active { color: var(--orange); border-bottom-color: var(--orange); }
+
+  /* ── Sections ────────────────────────────── */
+  .section {
+    max-width: 1100px; margin: 0 auto;
+    padding: 48px 32px;
+  }
+
+  .section-header {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 32px;
+  }
+  .section-header .num {
+    background: var(--orange); color: white;
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 16px; flex-shrink: 0;
+  }
+  .section-header h2 {
+    font-size: 26px; font-weight: 800; color: var(--dark);
+  }
+  .section-header p { font-size: 14px; color: var(--muted); }
+
+  /* ── IA Tree ─────────────────────────────── */
+  .ia-root {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 0;
+  }
+
+  .ia-app-box {
+    background: var(--orange); color: white;
+    border-radius: 14px; padding: 14px 36px;
+    font-size: 18px; font-weight: 800; letter-spacing: -.5px;
+    box-shadow: 0 4px 16px rgba(232,85,10,.3);
+  }
+
+  .ia-connector-v {
+    width: 2px; height: 32px; background: var(--orange-mid);
+    margin: 0 auto;
+  }
+
+  .ia-split {
+    display: flex; gap: 16px; align-items: flex-start; justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .ia-branch {
+    display: flex; flex-direction: column; align-items: center; gap: 0;
+    min-width: 120px;
+  }
+
+  .ia-branch-line {
+    width: 2px; height: 28px; background: #CCC;
+  }
+
+  .ia-screen-box {
+    border-radius: 10px; padding: 10px 14px;
+    font-size: 13px; font-weight: 700;
+    text-align: center; min-width: 110px;
+    border: 2px solid;
+  }
+
+  .ia-screen-box.auth { border-color: #9C27B0; color: #9C27B0; background: #F9F0FF; }
+  .ia-screen-box.main { border-color: var(--orange); color: var(--orange); background: var(--orange-light); }
+  .ia-screen-box.onboard { border-color: #2196F3; color: #2196F3; background: #E3F2FD; }
+
+  .ia-children {
+    display: flex; flex-direction: column; align-items: center; gap: 0; width: 100%;
+  }
+  .ia-child-item {
+    background: white; border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 12px;
+    font-size: 12px; color: var(--text);
+    margin-top: 6px; width: 100%; text-align: center;
+  }
+  .ia-child-item .icon { margin-right: 4px; }
+
+  .ia-h-connector {
+    display: flex; align-items: center; justify-content: center;
+    position: relative; width: 100%; height: 2px;
+    margin: 0 8px;
+  }
+
+  /* ── Tab cards ───────────────────────────── */
+  .tab-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+    margin-top: 24px;
+  }
+
+  .tab-card {
+    background: white; border-radius: 14px;
+    border: 1px solid var(--border);
+    padding: 20px;
+    transition: box-shadow .2s, transform .2s;
+  }
+  .tab-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,.08); transform: translateY(-2px); }
+
+  .tab-card .tc-head {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+  }
+  .tab-card .tc-emoji { font-size: 28px; }
+  .tab-card .tc-name { font-size: 16px; font-weight: 700; }
+  .tab-card .tc-code { font-size: 11px; color: var(--muted); font-family: monospace; }
+
+  .tab-card ul {
+    list-style: none; padding: 0;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .tab-card li {
+    font-size: 13px; color: var(--text);
+    padding-left: 16px; position: relative;
+  }
+  .tab-card li::before {
+    content: '•'; color: var(--orange);
+    position: absolute; left: 0;
+  }
+
+  /* ── Mermaid diagram wrapper ─────────────── */
+  .diagram-box {
+    background: white; border-radius: 14px;
+    border: 1px solid var(--border);
+    padding: 32px 24px; margin-top: 16px;
+    overflow-x: auto;
+  }
+  .diagram-box .mermaid {
+    display: flex; justify-content: center;
+  }
+
+  .diagram-title {
+    font-size: 15px; font-weight: 700; color: var(--dark);
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .diagram-title::before {
+    content: ''; display: inline-block;
+    width: 4px; height: 18px;
+    background: var(--orange); border-radius: 2px;
+  }
+
+  /* ── DB table ────────────────────────────── */
+  .db-table {
+    width: 100%; border-collapse: collapse;
+    background: white; border-radius: 12px;
+    overflow: hidden; border: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .db-table th {
+    background: var(--dark); color: white;
+    padding: 12px 16px; text-align: left; font-weight: 700;
+  }
+  .db-table td { padding: 10px 16px; border-bottom: 1px solid var(--border); }
+  .db-table tr:last-child td { border-bottom: none; }
+  .db-table tr:nth-child(even) td { background: #FAFAFA; }
+  .db-table .tname { font-family: monospace; font-weight: 700; color: var(--orange); }
+  .db-table .cols { font-family: monospace; font-size: 12px; color: #555; }
+
+  /* ── badge ───────────────────────────────── */
+  .badge {
+    display: inline-block; padding: 2px 8px;
+    border-radius: 20px; font-size: 11px; font-weight: 700;
+  }
+  .badge.high { background: #FFEBEE; color: #C62828; }
+  .badge.mid  { background: #FFF3E0; color: #E65100; }
+  .badge.low  { background: #E8F5E9; color: #2E7D32; }
+
+  /* ── legend ──────────────────────────────── */
+  .legend {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; color: var(--muted);
+  }
+  .legend-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+  }
+
+  /* ── footer ──────────────────────────────── */
+  footer {
+    background: var(--dark); color: #888;
+    text-align: center; padding: 24px;
+    font-size: 13px; margin-top: 60px;
+  }
+
+  /* ── divider ─────────────────────────────── */
+  .divider {
+    border: none; border-top: 1px solid var(--border);
+    max-width: 1100px; margin: 0 auto;
+  }
+
+  /* ── print ───────────────────────────────── */
+  @media print {
+    .nav { display: none; }
+    .section { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Cover -->
+<div class="cover">
+  <span class="emoji">🧡</span>
+  <h1>랭디 커넥트</h1>
+  <div class="sub">INFORMATION ARCHITECTURE &amp; FLOWCHART</div>
+  <div class="meta">
+    <span>📅 2026년 4월</span>
+    <span>🛠 Next.js + Supabase</span>
+    <span>👥 사내 전용</span>
+  </div>
+</div>
+
+<!-- Nav -->
+<nav class="nav">
+  <a href="#ia" class="active">📐 IA</a>
+  <a href="#tabs">📱 탭별 구조</a>
+  <a href="#flow-auth">🔐 인증 플로우</a>
+  <a href="#flow-matching">🍱 매칭 플로우</a>
+  <a href="#flow-club">🎯 동아리 플로우</a>
+  <a href="#flow-lightning">⚡ 번개 플로우</a>
+  <a href="#db">🗄 데이터 모델</a>
+</nav>
+
+<!-- ════════════════════════════════════ -->
+<!-- 1. IA -->
+<!-- ════════════════════════════════════ -->
+<section class="section" id="ia">
+  <div class="section-header">
+    <div class="num">1</div>
+    <div>
+      <h2>정보 구조 (Information Architecture)</h2>
+      <p>앱 전체 화면 구조와 탭 계층</p>
+    </div>
+  </div>
+
+  <div class="diagram-box">
+    <div class="mermaid">
+graph TD
+    APP["🧡 랭디 커넥트 앱"]
+
+    APP --> AUTH["🔐 인증 플로우"]
+    APP --> MAIN["📱 메인 앱 (MainScreen)"]
+
+    AUTH --> LOGIN["LoginScreen\n로그인 / 회원가입"]
+    AUTH --> OG["OnboardingGender\n성별 선택"]
+    AUTH --> OD["OnboardingDetail\n팀·직무·취미·한마디"]
+
+    LOGIN -->|신규 회원| OG
+    OG --> OD
+    OD -->|완료| MAIN
+
+    MAIN --> T1["🏠 홈\nHomeScreen"]
+    MAIN --> T2["🧡 너랑 랭디랑\nLangdyGuideScreen"]
+    MAIN --> T3["👥 피플\nPeopleScreen"]
+    MAIN --> T4["🍱 매칭\nMatchingScreen"]
+    MAIN --> T5["📅 캘린더\nCalendarScreen"]
+    MAIN --> T6["🎯 동아리\nClubScreen"]
+    MAIN --> T7["🍜 주변 음식점\nRestaurantScreen"]
+    MAIN --> T8["👤 My\nMyScreen"]
+
+    T1 --> H1["오늘 매칭자"]
+    T1 --> H2["생일자"]
+    T1 --> H3["동아리 일정 전체"]
+    T1 --> H4["번개 목록 전체"]
+
+    T2 --> G1["기본사항 (WIFI·주소)"]
+    T2 --> G2["근무규칙"]
+    T2 --> G3["랭디문화"]
+    T2 --> G4["🔍 키워드 검색"]
+
+    T3 --> P1["구성원 카드 목록"]
+    T3 --> P2["상세 프로필 모달"]
+
+    T4 --> M1["오늘 매칭자"]
+    T4 --> M2["내일 매칭자"]
+    T4 --> M3["매칭 실행 버튼"]
+    T4 --> M4["그룹 승인/거절"]
+
+    T5 --> C1["월별 캘린더"]
+    T5 --> C2["매칭·동아리·번개 이벤트"]
+
+    T6 --> CL1["동아리 목록"]
+    T6 --> CL2["가입 신청"]
+    T6 --> CL3["일정 관리"]
+    T6 --> CL4["회원 관리 (회장)"]
+
+    T8 --> MY1["프로필 조회/수정"]
+    T8 --> MY2["번개 참여 이력"]
+    T8 --> MY3["로그아웃"]
+
+    style APP fill:#E8550A,color:#fff,stroke:#E8550A
+    style MAIN fill:#FFF3EC,stroke:#E8550A,color:#333
+    style AUTH fill:#EDE7F6,stroke:#9C27B0,color:#333
+    style LOGIN fill:#F3E5F5,stroke:#9C27B0,color:#333
+    style OG fill:#F3E5F5,stroke:#9C27B0,color:#333
+    style OD fill:#F3E5F5,stroke:#9C27B0,color:#333
+    style T1 fill:#FFF3EC,stroke:#E8550A
+    style T2 fill:#FFF3EC,stroke:#E8550A
+    style T3 fill:#FFF3EC,stroke:#E8550A
+    style T4 fill:#FFF3EC,stroke:#E8550A
+    style T5 fill:#FFF3EC,stroke:#E8550A
+    style T6 fill:#FFF3EC,stroke:#E8550A
+    style T7 fill:#FFF3EC,stroke:#E8550A
+    style T8 fill:#FFF3EC,stroke:#E8550A
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════ -->
+<!-- 2. 탭별 구조 -->
+<!-- ════════════════════════════════════ -->
+<section class="section" id="tabs">
+  <div class="section-header">
+    <div class="num">2</div>
+    <div>
+      <h2>탭별 상세 구조</h2>
+      <p>각 탭의 기능 목록 및 컴포넌트</p>
+    </div>
+  </div>
+
+  <div class="tab-grid">
+    <div class="tab-card">
+      <div class="tc-head">
+        <span class="tc-emoji">🏠</span>
+        <div>
+          <div class="tc-name">홈</div>
+          <div class="tc-code">HomeScreen.tsx</div>
+        </div>
+      </div>
+      <ul>
+        <li>오늘 매칭자 카드</li>
+        <li>생일자 표시</li>
+        <li>전체 동아리 일정</li>
+        <li>전체 번개 목록 + 참여/취소</li>
+        <li>Promise.all 병렬 로딩</li>
+      </ul>
+    </div>
+
+    <div class="tab-card">
+      <div class="tc-head">
+        <span class="tc-emoji">🧡</span>
+        <div>
+          <div class="tc-name">너랑 랭디랑</div>
+          <div class="tc-code">LangdyGuideScreen.tsx</div>
+        </div>
+      </div>
+      <ul>
+        <li>기본사항 / 근무규칙 / 랭디문화</li>
+        <li>앵커 네비게이션</li>
+        <li>키워드 실시간 검색 + 하이라이트</li>
+        <li>정적 데이터 (company-guide.ts)</li>
+        <li>읽기 전용 — DB 불필요</li>
+      </ul>
+    </div>
+
+    <div class="tab-card">
+      <div class="tc-head">
+        <span class="tc-emoji">👥</span>
+        <div>
+          <div class="tc-name">피플</div>
+          <div class="tc-code">PeopleScreen.tsx</div>
+        </div>
+      </div>
+      <ul>
+        <li>구성원 카드 그리드</li>
+        <li>이름·팀·직무·취미 표시</li>
+        <li>클릭 → 상세 프로필 모달</li>
+        <li>본인 카드 강조 표시</li>
+      </ul>
+    </div>
+
+    <div class="tab-card">
+      <div class="tc-head">
+        <span class="tc-emoji">🍱</span>
+        <div>
+          <div class="tc-name">매칭</div>
+          <div class="tc-code">MatchingScreen.tsx</div>
+        </div>
+      </div>
+      <ul>
+        <li>오늘/내일 매칭자 표시</li>
+        <li>매칭 실행 (당번만 가능)</li>
+        <li>그룹 승인/거절 (과반수 확정)</li>
+        <li>Supabase 직접 조회</li>
+        <li>모듈 캐시 30초 TTL</li>
+      </ul>
+    </div>
+
+    <div class="tab-card">
+      <div class="tc-head">
+        <span class="tc-emoji">📅</span>
+        <div>
+          <div class="tc-name">캘린더</div>
+          <div class="tc-code">CalendarScreen.tsx</div>
+        </div>
+      </div>
+      <ul>
+        <li>월별 그리드 뷰</li>
+        <li>이전/다음 월 네비게이션</li>
+        <li>매칭 / 동아리 / 번개 통합 표시</li>
+        <li>날짜 클릭 → 이벤트 목록</li>
+      </ul>
+    </div>
+
+    <div class="tab-card">
+      <div class="tc-head">
+        <span class="tc-emoji">🎯</span>
+        <div>
+          <div class="tc-name">동아리</div>
+          <div class="tc-code">ClubScreen.tsx</div>
+        </div>
+      </div>
+      <ul>
+        <li>동아리 목록 카드</li>
+        <li>가입 신청 / 탈퇴</li>
+        <li>회장: 신청 승인/거절</li>
+        <li>회장: 일정 생성·관리</li>
+        <li>일정 출석 응답 (참석/불참)</li>
+      </ul>
+    </div>
+
+    <div class="tab-card">
+      <div class="tc-head">
+        <span class="tc-emoji">🍜</span>
+        <div>
+          <div class="tc-name">주변 음식점</div>
+          <div class="tc-code">RestaurantScreen.tsx</div>
+        </div>
+      </div>
+      <ul>
+        <li>사무실 근처 음식점 목록</li>
+        <li>지도 표시 (v2 목표)</li>
+      </ul>
+    </div>
+
+    <div class="tab-card">
+      <div class="tc-head">
+        <span class="tc-emoji">👤</span>
+        <div>
+          <div class="tc-name">My</div>
+          <div class="tc-code">MyScreen.tsx</div>
+        </div>
+      </div>
+      <ul>
+        <li>내 프로필 표시</li>
+        <li>팀·직무·취미·한마디 수정</li>
+        <li>번개 참여 이력</li>
+        <li>로그아웃</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════ -->
+<!-- 3. 인증 플로우 -->
+<!-- ════════════════════════════════════ -->
+<section class="section" id="flow-auth">
+  <div class="section-header">
+    <div class="num">3</div>
+    <div>
+      <h2>플로우차트 — 인증 & 온보딩</h2>
+      <p>로그인 / 회원가입 / 온보딩 사용자 흐름</p>
+    </div>
+  </div>
+
+  <div class="diagram-box">
+    <div class="diagram-title">인증 & 온보딩 플로우</div>
+    <div class="mermaid">
+flowchart TD
+    START([앱 진입]) --> CHECK{세션 존재?}
+    CHECK -->|Yes| PROFILE_CHECK{온보딩\n완료?}
+    CHECK -->|No| LOGIN[LoginScreen\n로그인/회원가입 탭]
+
+    LOGIN --> TAB{탭 선택}
+    TAB -->|로그인| DO_LOGIN[이메일+비밀번호\n입력]
+    TAB -->|회원가입| DO_REGISTER[이름·이메일·비밀번호\n입력]
+
+    DO_LOGIN --> LOGIN_RESULT{인증 결과}
+    LOGIN_RESULT -->|실패| ERR1[오류 메시지 표시]
+    ERR1 --> LOGIN
+
+    LOGIN_RESULT -->|성공| PROFILE_CHECK
+
+    DO_REGISTER --> VALIDATE{유효성 검사\n이름≤5자 등}
+    VALIDATE -->|실패| ERR2[오류 메시지]
+    ERR2 --> DO_REGISTER
+    VALIDATE -->|통과| SUPABASE_AUTH[Supabase Auth\n계정 생성]
+    SUPABASE_AUTH --> OB_GENDER
+
+    PROFILE_CHECK -->|미완료| OB_GENDER[OnboardingGender\n성별 선택]
+    PROFILE_CHECK -->|완료| MAIN_APP
+
+    OB_GENDER --> OB_DETAIL[OnboardingDetail\n팀·직무·취미·한마디]
+    OB_DETAIL --> SAVE_PROFILE[users 테이블\nUPDATE]
+    SAVE_PROFILE --> MAIN_APP([MainScreen\n메인 앱 진입])
+
+    style START fill:#E8550A,color:#fff,stroke:#E8550A
+    style MAIN_APP fill:#E8550A,color:#fff,stroke:#E8550A
+    style LOGIN fill:#EDE7F6,stroke:#9C27B0
+    style OB_GENDER fill:#E3F2FD,stroke:#2196F3
+    style OB_DETAIL fill:#E3F2FD,stroke:#2196F3
+    style ERR1 fill:#FFEBEE,stroke:#F44336
+    style ERR2 fill:#FFEBEE,stroke:#F44336
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════ -->
+<!-- 4. 매칭 플로우 -->
+<!-- ════════════════════════════════════ -->
+<section class="section" id="flow-matching">
+  <div class="section-header">
+    <div class="num">4</div>
+    <div>
+      <h2>플로우차트 — 매칭 프로세스</h2>
+      <p>1:1 랜덤 점심 매칭 실행부터 그룹 확정까지</p>
+    </div>
+  </div>
+
+  <div class="diagram-box">
+    <div class="diagram-title">매칭 실행 & 승인 플로우</div>
+    <div class="mermaid">
+flowchart TD
+    OPEN[매칭 탭 진입] --> LOAD[Supabase 직접 조회\nPromise.all 병렬]
+    LOAD --> CACHE{모듈 캐시\n유효?}
+    CACHE -->|Yes, TTL 30s| SHOW_CACHE[캐시 데이터 표시]
+    CACHE -->|No| FETCH[matching_turns·\nmatching_groups 조회]
+    FETCH --> SHOW_DATA[화면 렌더링]
+
+    SHOW_DATA --> IS_MATCHER{오늘 내가\n매칭 당번?}
+
+    IS_MATCHER -->|No| WAIT_STATE[대기 화면\n매칭자·그룹 현황 표시]
+
+    IS_MATCHER -->|Yes, 미실행| RUN_BTN[매칭 실행 버튼 표시]
+    RUN_BTN --> CLICK_RUN[버튼 클릭]
+    CLICK_RUN --> API_POST[POST /api/matching]
+    API_POST --> RAND[랜덤 그룹 선정\n전체 구성원 중 셔플]
+    RAND --> SAVE_GROUP[matching_groups 저장\napproval_status=대기중]
+    SAVE_GROUP --> CAL[calendar_events\n점심 이벤트 생성]
+    CAL --> CLEAR_CACHE[모듈 캐시 초기화]
+    CLEAR_CACHE --> SHOW_GROUP[그룹 구성원 표시\n승인 대기 UI]
+
+    SHOW_GROUP --> EACH_MEMBER{각 그룹 구성원}
+    EACH_MEMBER --> APPROVE_BTN[승인 / 거절 버튼]
+    APPROVE_BTN --> CLICK{선택}
+
+    CLICK -->|승인| POST_APPROVE[POST /api/matching/approve\napprove=true]
+    CLICK -->|거절| POST_REJECT[POST /api/matching/approve\napprove=false]
+
+    POST_APPROVE --> COUNT{과반수\n승인?}
+    POST_REJECT --> COUNT
+
+    COUNT -->|Yes| CONFIRM[approval_status=확정\n점심 일정 확정]
+    COUNT -->|No| PENDING[승인 대기 유지]
+
+    style OPEN fill:#FFF3EC,stroke:#E8550A
+    style API_POST fill:#E8550A,color:#fff,stroke:#E8550A
+    style CONFIRM fill:#E8F5E9,stroke:#4CAF50
+    style CLEAR_CACHE fill:#FFF9C4,stroke:#F9A825
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════ -->
+<!-- 5. 동아리 플로우 -->
+<!-- ════════════════════════════════════ -->
+<section class="section" id="flow-club">
+  <div class="section-header">
+    <div class="num">5</div>
+    <div>
+      <h2>플로우차트 — 동아리</h2>
+      <p>가입 신청부터 일정 관리까지의 흐름</p>
+    </div>
+  </div>
+
+  <div class="diagram-box">
+    <div class="diagram-title">동아리 가입 & 운영 플로우</div>
+    <div class="mermaid">
+flowchart TD
+    COPEN[동아리 탭 진입] --> CLIST[전체 동아리 목록 표시]
+    CLIST --> CSELECT[동아리 선택]
+
+    CSELECT --> ROLE{내 역할}
+
+    ROLE -->|비회원| APPLY_BTN[가입 신청 버튼]
+    APPLY_BTN --> INSERT_MEMBER[club_members INSERT\nstatus=신청중]
+    INSERT_MEMBER --> WAIT_APPROVAL[승인 대기 상태]
+
+    ROLE -->|일반 회원| MEMBER_VIEW[회원 메뉴\n일정 확인·탈퇴]
+    MEMBER_VIEW --> EVENT_LIST[다가오는 일정 목록]
+    EVENT_LIST --> ATTEND{출석 응답}
+    ATTEND -->|참석| UPD_ATT1[club_event_attendances\nstatus=참석]
+    ATTEND -->|불참| UPD_ATT2[club_event_attendances\nstatus=불참]
+    MEMBER_VIEW --> LEAVE_BTN[탈퇴 버튼]
+    LEAVE_BTN --> DEL_MEMBER[club_members DELETE]
+
+    ROLE -->|회장| PRESIDENT_VIEW[회장 메뉴]
+    PRESIDENT_VIEW --> PEND_LIST[신청자 목록]
+    PEND_LIST --> APPROVE_Q{승인 여부}
+    APPROVE_Q -->|승인| UPD_STATUS1[club_members\nstatus=승인]
+    APPROVE_Q -->|거절| UPD_STATUS2[club_members\nstatus=거절]
+
+    PRESIDENT_VIEW --> CREATE_EVENT[일정 생성]
+    CREATE_EVENT --> INPUT_EVENT[날짜·이름·장소·시간 입력]
+    INPUT_EVENT --> SAVE_EVENT[club_events INSERT]
+    SAVE_EVENT --> BADGE_UPDATE[뱃지 카운트 갱신]
+
+    style COPEN fill:#FFF3EC,stroke:#E8550A
+    style INSERT_MEMBER fill:#E3F2FD,stroke:#2196F3
+    style UPD_STATUS1 fill:#E8F5E9,stroke:#4CAF50
+    style UPD_STATUS2 fill:#FFEBEE,stroke:#F44336
+    style SAVE_EVENT fill:#E8550A,color:#fff,stroke:#E8550A
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════ -->
+<!-- 6. 번개 플로우 -->
+<!-- ════════════════════════════════════ -->
+<section class="section" id="flow-lightning">
+  <div class="section-header">
+    <div class="num">6</div>
+    <div>
+      <h2>플로우차트 — 번개 모임</h2>
+      <p>번개 생성·참여 흐름</p>
+    </div>
+  </div>
+
+  <div class="diagram-box">
+    <div class="diagram-title">번개 모임 플로우</div>
+    <div class="mermaid">
+flowchart TD
+    HOME[홈 화면] --> LGLIST[번개 목록 표시\n전체 공개]
+
+    LGLIST --> LG_ITEM[번개 카드 클릭]
+    LG_ITEM --> IS_JOINED{참여 중?}
+
+    IS_JOINED -->|No| JOIN_BTN[참여하기 버튼]
+    JOIN_BTN --> INSERT_PART[lightning_participants\nINSERT]
+    INSERT_PART --> SHOW_JOINED[참여 완료 표시]
+
+    IS_JOINED -->|Yes| CANCEL_BTN[참여 취소 버튼]
+    CANCEL_BTN --> DEL_PART[lightning_participants\nDELETE]
+    DEL_PART --> SHOW_CANCELED[취소 완료 표시]
+
+    HOME --> CREATE_LG[번개 생성 버튼\n권한 있는 사용자]
+    CREATE_LG --> LG_FORM[제목·날짜·시간·장소 입력]
+    LG_FORM --> SAVE_LG[lightning_events INSERT\ncreator_id = 내 id]
+    SAVE_LG --> CAL_LG[calendar_events 등록]
+    CAL_LG --> NOTIFY[홈 화면에 번개 카드 표시]
+
+    style HOME fill:#FFF3EC,stroke:#E8550A
+    style INSERT_PART fill:#E8F5E9,stroke:#4CAF50
+    style DEL_PART fill:#FFEBEE,stroke:#F44336
+    style SAVE_LG fill:#E8550A,color:#fff,stroke:#E8550A
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════ -->
+<!-- 7. 데이터 모델 -->
+<!-- ════════════════════════════════════ -->
+<section class="section" id="db">
+  <div class="section-header">
+    <div class="num">7</div>
+    <div>
+      <h2>데이터 모델 (Supabase 테이블)</h2>
+      <p>주요 테이블 구조 요약</p>
+    </div>
+  </div>
+
+  <div class="diagram-box">
+    <div class="diagram-title">테이블 관계도 (ERD 요약)</div>
+    <div class="mermaid">
+erDiagram
+    users {
+        uuid id PK
+        text name
+        text email
+        text team
+        text role
+        text gender
+        text[] hobbies
+        text bio
+    }
+
+    matching_turns {
+        uuid id PK
+        date date
+        uuid matcher_id FK
+        text status
+    }
+
+    matching_groups {
+        uuid id PK
+        date date
+        uuid[] members
+        text approval_status
+        jsonb approvals
+    }
+
+    calendar_events {
+        uuid id PK
+        date date
+        text title
+        text type
+        uuid related_id
+    }
+
+    clubs {
+        uuid id PK
+        text name
+        text description
+        text category
+        uuid president_id FK
+    }
+
+    club_members {
+        uuid id PK
+        uuid club_id FK
+        uuid user_id FK
+        text role
+        text status
+    }
+
+    club_events {
+        uuid id PK
+        uuid club_id FK
+        date date
+        text name
+        text location
+        text time
+    }
+
+    club_event_attendances {
+        uuid id PK
+        uuid event_id FK
+        uuid user_id FK
+        text status
+    }
+
+    lightning_events {
+        uuid id PK
+        text title
+        date date
+        text time
+        text location
+        uuid creator_id FK
+    }
+
+    lightning_participants {
+        uuid event_id FK
+        uuid user_id FK
+    }
+
+    users ||--o{ matching_turns : "matcher"
+    users ||--o{ club_members : "joins"
+    users ||--o{ lightning_participants : "participates"
+    clubs ||--o{ club_members : "has"
+    clubs ||--o{ club_events : "hosts"
+    club_events ||--o{ club_event_attendances : "has"
+    lightning_events ||--o{ lightning_participants : "has"
+    </div>
+  </div>
+
+  <div style="margin-top: 24px;">
+    <table class="db-table">
+      <thead>
+        <tr>
+          <th>테이블</th>
+          <th>주요 컬럼</th>
+          <th>용도</th>
+          <th>주의사항</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="tname">users</td><td class="cols">id, name, team, role, gender, hobbies, bio</td><td>구성원 프로필. Supabase Auth uid 연결</td><td>이름 필드 허용 문자 명시 필요</td></tr>
+        <tr><td class="tname">matching_turns</td><td class="cols">date, matcher_id, status</td><td>날짜별 매칭 당번 및 진행 상태</td><td>같은 날짜 중복 방지 unique constraint 권장</td></tr>
+        <tr><td class="tname">matching_groups</td><td class="cols">date, members[], approval_status</td><td>매칭 완료 그룹 정보</td><td>members는 uuid[] 배열</td></tr>
+        <tr><td class="tname">calendar_events</td><td class="cols">date, title, type, related_id</td><td>캘린더 통합 이벤트</td><td>매칭 실행 API에서만 생성됨 (직접 INSERT 불가)</td></tr>
+        <tr><td class="tname">clubs</td><td class="cols">id, name, category, president_id</td><td>동아리 기본 정보</td><td>president_id → users.id FK 정의 필요</td></tr>
+        <tr><td class="tname">club_members</td><td class="cols">club_id, user_id, role, status</td><td>동아리 멤버 (신청중/승인/거절)</td><td>unique(club_id, user_id) constraint 없음 → ON CONFLICT 불가</td></tr>
+        <tr><td class="tname">club_events</td><td class="cols">club_id, date, name, location</td><td>동아리 일정</td><td></td></tr>
+        <tr><td class="tname">club_event_attendances</td><td class="cols">event_id, user_id, status</td><td>출석 응답</td><td>뱃지 카운트와 연동</td></tr>
+        <tr><td class="tname">lightning_events</td><td class="cols">id, title, date, time, creator_id</td><td>번개 모임</td><td></td></tr>
+        <tr><td class="tname">lightning_participants</td><td class="cols">event_id, user_id</td><td>번개 참여자</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer>
+  🧡 랭디 커넥트 — IA &amp; Flowchart &nbsp;|&nbsp; Next.js + Supabase &nbsp;|&nbsp; 2026
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#FFF3EC',
+      primaryTextColor: '#333333',
+      primaryBorderColor: '#E8550A',
+      lineColor: '#E8550A',
+      secondaryColor: '#F5F5F5',
+      tertiaryColor: '#FFFFFF',
+      fontSize: '14px',
+    },
+    flowchart: { curve: 'basis', htmlLabels: true, useMaxWidth: false },
+    er: { useMaxWidth: false },
+  });
+
+  // Nav active state on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.nav a');
+
+  window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(s => {
+      if (window.scrollY >= s.offsetTop - 100) current = s.id;
+    });
+    navLinks.forEach(a => {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+    });
+  });
+</script>
+</body>
+</html>
